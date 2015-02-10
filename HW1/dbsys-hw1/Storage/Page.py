@@ -465,7 +465,7 @@ class Page(BytesIO):
         if start is end:
             self.getbuffer()[start:(start + self.header.tupleSize)] = bytearray(b'\x00' * self.header.tupleSize);
         else:
-            for startId in xrange(start + self.header.tupleSize, end + self.header.tupleSize, self.header.tupleSize):
+            for startId in range(start + self.header.tupleSize, end + self.header.tupleSize, self.header.tupleSize):
                 self.getbuffer()[(startId - self.header.tupleSize):startId] = self.getvalue()[startId : (startId + self.header.tupleSize)]
         
         self.header.freeSpaceOffset = end;
