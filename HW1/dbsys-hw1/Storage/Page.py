@@ -190,9 +190,10 @@ class PageHeader:
     # update freeSpaceOffset when allocating next tuples.  
     if (self.freeSpaceOffset == 0) :
         self.freeSpaceOffset += self.headerSize();
+        return self.freeSpaceOffset;
 
-    if self.hasFreeTuple():
-        self.freeSpaceOffset += (self.numTuples() + 1) * self.tupleSize; 
+    elif (self.freeSpaceOffset != 0 and self.hasFreeTuple()):
+        self.freeSpaceOffset = (self.numTuples() + 1) * self.tupleSize; 
         return self.freeSpaceOffset - self.tupleSize;
     else:
         return None;
