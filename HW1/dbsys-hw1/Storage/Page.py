@@ -427,7 +427,7 @@ class Page(BytesIO):
     
     tupleIndex = tupleId.tupleIndex;
     if ( tupleIndex > (self.header.numTuples() - 1) ):
-        raise ValueError("Parameter: tupleId is out of bound.");
+        raise ValueError("Parameter: tupleId is out of bound. Can't put in empty spot.");
     else:
         start = self.header.headerSize() + tupleIndex * self.header.tupleSize;
         self.getbuffer()[start:(start + self.header.tupleSize)] = tupleData;
@@ -443,17 +443,32 @@ class Page(BytesIO):
 
   # Zeroes out the contents of the tuple at the given tuple id.
   def clearTuple(self, tupleId):
+      
     tupleIndex = tupleId.tupleIndex;
     if ( tupleIndex > (self.header.numTuples() - 1) ):
-        raise ValueError("Parameter: tupleId is out of bound.");
+        raise ValueError("Parameter: tupleId is out of bound. Nothing to clear.");
     else:
         start = self.header.headerSize() + tupleIndex * self.header.tupleSize;
         self.getbuffer()[start:(start + self.header.tupleSize)] = bytearray(b'\x00' * self.header.tupleSize);
 
   # Removes the tuple at the given tuple id, shifting subsequent tuples.
   def deleteTuple(self, tupleId):
-    raise NotImplementedError
-
+    
+    tupleIndex = tupleId.tupleIndex;
+    if ( tupleIndex > (self.header.numTuples() - 1) ):
+        raise ValueError("Parameter: tupleId is out of bound. Nothing to delete.");
+    else:
+        start = self.header.headerSize() + tupleIndex * self.header.tupleSize;
+        end   = self.header.headerSize() + (self.header.numTuples() - 1) * self.header.tupleSize;
+        
+        # deleting tuples:
+        if start is end:
+            self.getbuffer()[start:(start + self.header.tupleSize)] = bytearray(b'\x00' * self.header.tupleSize);
+        else:
+            for startId in xrange(start + self.header.tupleSize, end + self.header.tupleSize, self.header.tupleSize):
+                self.getbuffer()[(startId - self.header.tupleSize):startId] = self.getvalue()[startId : (startId + self.header.tupleSize)]
+        
+        self.header.freeSpaceOffset = end;
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained
   # within the page by packing the header in place.
