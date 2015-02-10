@@ -128,11 +128,15 @@ class PageHeader:
   # tupleSize    : the tuple size in bytes
   # pageCapacity : the page size in bytes
   def __init__(self, **kwargs):
+      
     buffer               = kwargs.get("buffer", None)
     self.flags           = kwargs.get("flags", b'\x00')
     self.tupleSize       = kwargs.get("tupleSize", None)
     self.pageCapacity    = kwargs.get("pageCapacity", len(buffer))
     self.freeSpaceOffset = 0;
+    
+    # Write header into buffer
+    buffer[0:8]          = self.pack();
 
   # Page header equality operation based on header fields.
   def __eq__(self, other):
@@ -170,7 +174,7 @@ class PageHeader:
 
   # Returns the space available in the page associated with this header.
   def freeSpace(self):
-    return self.pageCapacity - self.usedSpace()
+    return self.pageCapacity - self.usedSpace() - self.headerSize();
 
   # Returns the space used in the page associated with this header.
   def usedSpace(self):
@@ -191,7 +195,8 @@ class PageHeader:
   # does not yield the same tupleIndex.
   def nextFreeTuple(self):
       
-    # update freeSpaceOffset when allocating next tuples.  
+    # update freeSpaceOffset when allocating next tuples. 
+    # Note that this is the only place that we handle freeSpaceOffset 
     if (self.freeSpaceOffset == 0) :
         self.freeSpaceOffset += self.headerSize() + self.tupleSize;
         return self.freeSpaceOffset - self.tupleSize;
