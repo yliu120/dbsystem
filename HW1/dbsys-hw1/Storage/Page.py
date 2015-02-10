@@ -362,20 +362,21 @@ class Page(BytesIO):
   # Also, any keyword arguments needed to construct a PageHeader.
   def __init__(self, **kwargs):
     buffer = kwargs.get("buffer", None)
+    
+    # What is this for???
     if buffer:
       BytesIO.__init__(self, buffer)
       self.pageId = kwargs.get("pageId", None)
       header      = kwargs.get("header", None)
       schema      = kwargs.get("schema", None)
-
+      
+      # This makes more sense.
       if self.pageId and header:
         self.header = header
       elif self.pageId:
         self.header = self.initializeHeader(**kwargs)
       else:
         raise ValueError("No page identifier provided to page constructor.")
-
-      raise NotImplementedError
 
     else:
       raise ValueError("No backing buffer provided to page constructor.")
@@ -413,15 +414,32 @@ class Page(BytesIO):
 
   # Returns a byte string representing a packed tuple for the given tuple id.
   def getTuple(self, tupleId):
-    raise NotImplementedError
+    
+    tupleIndex = tupleId.tupleIndex;
+    if ( tupleIndex > (self.header.numTuples() - 1) ):
+        raise ValueError("Parameter: tupleId is out of bound.");
+    else:
+        start = self.header.headerSize() + tupleIndex * self.header.tupleSize;
+        return self.getvalue()[start:(start + self.header.tupleSize)];
 
   # Updates the (packed) tuple at the given tuple id.
   def putTuple(self, tupleId, tupleData):
-    raise NotImplementedError
+    
+    tupleIndex = tupleId.tupleIndex;
+    if ( tupleIndex > (self.header.numTuples() - 1) ):
+        raise ValueError("Parameter: tupleId is out of bound.");
+    else:
+        start = self.header.headerSize() + tupleIndex * self.header.tupleSize;
+        self.getbuffer()[start:(start + self.header.tupleSize)] = tupleData;
 
   # Adds a packed tuple to the page. Returns the tuple id of the newly added tuple.
   def insertTuple(self, tupleData):
-    raise NotImplementedError
+    if self.header.hasFreeTuple():
+        tupleIndex = self.header.nextFreeTuple();
+        self.getbuffer()[tupleIndex:(tupleIndex+self.header.tupleSize)] = tupleData;
+        return TupleId(self.pageId, self.header.numTuples() - 1);
+    else:
+        raise ValueError("This page is full!");
 
   # Zeroes out the contents of the tuple at the given tuple id.
   def clearTuple(self, tupleId):
