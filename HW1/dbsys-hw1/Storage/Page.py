@@ -167,15 +167,18 @@ class PageHeader:
 
   # Returns the space available in the page associated with this header.
   def freeSpace(self):
-    raise NotImplementedError
+    return self.pageCapacity - self.usedSpace()
 
   # Returns the space used in the page associated with this header.
   def usedSpace(self):
-    raise NotImplementedError
+    return 
 
   # Returns whether the page has any free space for a tuple.
   def hasFreeTuple(self):
-    raise NotImplementedError
+    if ( freeSpace() - self.tupleSize ) >= 0 :
+        return True;
+    else:
+        return False;
 
   # Returns the page offset of the next free tuple.
   # This should also "allocate" the tuple, such that any subsequent call
