@@ -129,7 +129,6 @@ class PageHeader:
     self.tupleSize       = kwargs.get("tupleSize", None)
     self.pageCapacity    = kwargs.get("pageCapacity", len(buffer))
     self.freeSpaceOffset = None
-    raise NotImplementedError
 
   # Page header equality operation based on header fields.
   def __eq__(self, other):
