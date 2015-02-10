@@ -141,7 +141,7 @@ class PageHeader:
     return hash((self.flags, self.tupleSize, self.pageCapacity, self.freeSpaceOffset))
 
   def headerSize(self):
-    return size;
+    return self.size;
 
   # Flag operations.
   def flag(self, mask):
