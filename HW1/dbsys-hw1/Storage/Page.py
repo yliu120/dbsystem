@@ -128,7 +128,7 @@ class PageHeader:
     self.flags           = kwargs.get("flags", b'\x00')
     self.tupleSize       = kwargs.get("tupleSize", None)
     self.pageCapacity    = kwargs.get("pageCapacity", len(buffer))
-    self.freeSpaceOffset = None
+    self.freeSpaceOffset = 0
 
   # Page header equality operation based on header fields.
   def __eq__(self, other):
@@ -170,7 +170,7 @@ class PageHeader:
 
   # Returns the space used in the page associated with this header.
   def usedSpace(self):
-    if self.freeSpaceOffset == None:
+    if self.freeSpaceOffset == 0:
         return 0;
     else:
         return self.freeSpaceOffset - self.headerSize();
@@ -188,7 +188,7 @@ class PageHeader:
   def nextFreeTuple(self):
       
     # update freeSpaceOffset when allocating next tuples.  
-    if (self.freeSpaceOffset == None) :
+    if (self.freeSpaceOffset == 0) :
         self.freeSpaceOffset += self.headerSize();
 
     if self.hasFreeTuple():
