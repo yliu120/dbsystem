@@ -443,7 +443,12 @@ class Page(BytesIO):
 
   # Zeroes out the contents of the tuple at the given tuple id.
   def clearTuple(self, tupleId):
-    raise NotImplementedError
+    tupleIndex = tupleId.tupleIndex;
+    if ( tupleIndex > (self.header.numTuples() - 1) ):
+        raise ValueError("Parameter: tupleId is out of bound.");
+    else:
+        start = self.header.headerSize() + tupleIndex * self.header.tupleSize;
+        self.getbuffer()[start:(start + self.header.tupleSize)] = bytearray(b'\x00' * self.header.tupleSize);
 
   # Removes the tuple at the given tuple id, shifting subsequent tuples.
   def deleteTuple(self, tupleId):
