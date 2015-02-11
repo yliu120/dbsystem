@@ -135,9 +135,9 @@ class PageHeader:
     self.pageCapacity    = kwargs.get("pageCapacity", len(buffer))
     self.freeSpaceOffset = 0;
     
-    # Write header into buffer
-    buffer[0:8]          = self.pack();
-
+    # write the head binary at the beginning
+    buffer[0:self.headerSize()] = self.pack();
+    
   # Page header equality operation based on header fields.
   def __eq__(self, other):
     return (    self.flags == other.flags
@@ -228,7 +228,7 @@ class PageHeader:
   def unpack(cls, buffer):
     values = PageHeader.binrepr.unpack_from(buffer)
     if len(values) == 4:
-      return cls(buffer=buffer, flags=values[0], tupleSize=values[1],
+      return cls( buffer=buffer, flags=values[0], tupleSize=values[1],
                  freeSpaceOffset=values[2], pageCapacity=values[3])
 
 
@@ -417,7 +417,7 @@ class Page(BytesIO):
     
     tupleIndex = tupleId.tupleIndex;
     if ( tupleIndex > (self.header.numTuples() - 1) ):
-        raise ValueError("Parameter: tupleId is out of bound.");
+        return 0;
     else:
         start = self.header.headerSize() + tupleIndex * self.header.tupleSize;
         return self.getvalue()[start:(start + self.header.tupleSize)];
@@ -469,19 +469,22 @@ class Page(BytesIO):
                 self.getbuffer()[(startId - self.header.tupleSize):startId] = self.getvalue()[startId : (startId + self.header.tupleSize)]
         
         self.header.freeSpaceOffset = end;
+        
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained
   # within the page by packing the header in place.
   def pack(self):
-    raise NotImplementedError
+    
+    self.getbuffer()[0:self.header.headerSize()] = self.header.pack();
+    return self.getvalue();
 
   # Creates a Page instance from the binary representation held in the buffer.
   # The pageId of the newly constructed Page instance is given as an argument.
   @classmethod
   def unpack(cls, pageId, buffer):
-    raise NotImplementedError
-
-
+      
+    header = PageHeader.unpack( BytesIO(buffer).getbuffer() );
+    return cls(pageId=pageId, buffer=buffer, header=header);
 
 if __name__ == "__main__":
     import doctest
