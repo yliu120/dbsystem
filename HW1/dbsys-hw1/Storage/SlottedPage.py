@@ -91,8 +91,10 @@ class SlottedPageHeader(PageHeader):
       PageHeader.__init__(self, buffer=buffer);
       self.numSlots   = math.floor( ( self.pageCapacity - 2 * 2 )  / float( self.tupleSize + 0.125 ) )  # every bit takes 1/8 byte.
       
-      # We keep an data stru
+      # We keep an array of slots which should be lazily updated. 
       self.slots            = [0 for x in range(0, self.numSlots)];
+      
+      # We implements a queue by list for availableSlots.
       self.availableSlots   = [];
       self.slotBufferLength = math.ceil( float(self.numSlots) / 8 );
       self.nextSlot         = 0;
@@ -100,6 +102,9 @@ class SlottedPageHeader(PageHeader):
       #initializing availableSlots
       for index in range(0, self.numSlots):
           self.availableSlots.append(index);
+          
+      # We write to buffer
+      buffer[0:self.headerSize()] = self.pack();
 
     else:
       raise ValueError("No backing buffer supplied for SlottedPageHeader")
@@ -159,6 +164,16 @@ class SlottedPageHeader(PageHeader):
         if index != 0:
             slotCount += 1;
     return slotCount;
+
+  # Call this function to update our self.slots object;
+  def updateSlots(self):
+    
+    for index in (0, self.numSlots):
+        self.slots[index] = 1;
+    
+    for index in self.availableSlots:
+        self.slots[index] = 0;
+    
   # Tuple allocation operations.
   
   # Returns whether the page has any free space for a tuple.
@@ -189,15 +204,38 @@ class SlottedPageHeader(PageHeader):
   def pack(self):
     
     packedHeader = Struct("HH").pack(self.numSlots, self.nextSlot);
-    for i in range(0, len(self.slotBuffer)):
-       packedHeader += Struct("H").pack(self.slotBuffer[i]);
+    
+    # Next, we packed our slot buffer to bits
+    bitSlot = 0
+    count8  = 0
+    
+    for i in range(0, self.numSlots):
+        if i == 0:
+            bitSlot = self.slots[0];
+            count8  = 0;
+        elif mod8(i) and i != 0:
+            packedHeader += Struct("B").pack(bitSlot);
+            bitSlot = self.slots[i];
+            count8  = 0;
+        else:
+            count8  += 1;
+            bitSlot |= ( self.slots[i] << count8 ); 
     
     return packedHeader;
 
   # Create a slotted page header instance from a binary representation held in the given buffer.
   @classmethod
   def unpack(cls, buffer):
-    raise NotImplementedError
+    
+    return 0;
+
+  # We implement a function that can returns whether index mod 8 = 0?
+  def mod8(self, index):
+    
+    if ((index & 1 == 0) and ((index >> 1) & 1) == 0 and ((index >> 2) & 1) == 0 ):
+       return True;
+    else:
+       return False;
 
 
 
