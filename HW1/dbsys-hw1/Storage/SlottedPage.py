@@ -10,7 +10,7 @@ from Storage.Page import PageHeader, Page
 # DESIGN QUESTION 1: should this inherit from PageHeader?
 # If so, what methods can we reuse from the parent?
 #
-class SlottedPageHeader:
+class SlottedPageHeader(PageHeader):
   """
   A slotted page header implementation. This should store a slot bitmap
   implemented as a memoryview on the byte buffer backing the page
@@ -85,7 +85,11 @@ class SlottedPageHeader:
     buffer     = kwargs.get("buffer", None)
     self.flags = kwargs.get("flags", b'\x00')
     if buffer:
-      raise NotImplementedError
+      self.tupleSize = kwargs.get();
+      PageHeader.__init__(self, buffer=buffer);
+      self.numSlots   = math.floor( ( self.pageCapacity - 2 * 2 )  / float( self.tupleSize + 0.125 ) )      # every bit takes 1/8 byte.
+      self.slotBuffer = [0 for x in range(0, math.ceil(float(self.numSlots) / 32))];
+      self.nextSlot   = 0;
     else:
       raise ValueError("No backing buffer supplied for SlottedPageHeader")
 
@@ -96,7 +100,7 @@ class SlottedPageHeader:
     raise NotImplementedError
 
   def headerSize(self):
-    return self.reprSize
+    return 2 + 2 + math.ceil( self.numSlots * 0.125 );
 
   # Flag operations.
   def flag(self, mask):
@@ -167,7 +171,12 @@ class SlottedPageHeader:
   # Create a binary representation of a slotted page header.
   # The binary representation should include the slot contents.
   def pack(self):
-    raise NotImplementedError
+    
+    packedHeader = Struct("HH").pack(self.numSlots, self.nextSlot);
+    for i in range(0, len(self.slotBuffer)):
+       packedHeader += Struct("H").pack(self.slotBuffer[i]);
+    
+    return packedHeader;
 
   # Create a slotted page header instance from a binary representation held in the given buffer.
   @classmethod
