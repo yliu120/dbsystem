@@ -82,25 +82,39 @@ class SlottedPageHeader(PageHeader):
   """
 
   def __init__(self, **kwargs):
+
     buffer     = kwargs.get("buffer", None)
     self.flags = kwargs.get("flags", b'\x00')
     if buffer:
-      self.tupleSize = kwargs.get();
+      self.tupleSize     = kwargs.get("tupleSize", None);
+      self.pageCapacity  = len(buffer);
       PageHeader.__init__(self, buffer=buffer);
-      self.numSlots   = math.floor( ( self.pageCapacity - 2 * 2 )  / float( self.tupleSize + 0.125 ) )      # every bit takes 1/8 byte.
-      self.slotBuffer = [0 for x in range(0, math.ceil(float(self.numSlots) / 32))];
-      self.nextSlot   = 0;
+      self.numSlots   = math.floor( ( self.pageCapacity - 2 * 2 )  / float( self.tupleSize + 0.125 ) )  # every bit takes 1/8 byte.
+      
+      # We keep an data stru
+      self.slots            = [0 for x in range(0, self.numSlots)];
+      self.availableSlots   = [];
+      self.slotBufferLength = math.ceil( float(self.numSlots) / 8 );
+      self.nextSlot         = 0;
+      
+      #initializing availableSlots
+      for index in range(0, self.numSlots):
+          self.availableSlots.append(index);
+
     else:
       raise ValueError("No backing buffer supplied for SlottedPageHeader")
 
   def __eq__(self, other):
-    raise NotImplementedError
+    return (    self.flags == other.flags
+            and self.tupleSize == other.tupleSize
+            and self.pageCapacity == other.pageCapacity
+            and self.nextSlot  == other.nextSlot )
 
   def __hash__(self):
-    raise NotImplementedError
+    return hash((self.flags, self.tupleSize, self.pageCapacity, self.nextSlot))
 
   def headerSize(self):
-    return 2 + 2 + math.ceil( self.numSlots * 0.125 );
+    return 2 + 2 + self.slotBufferLength; 
 
   # Flag operations.
   def flag(self, mask):
@@ -120,53 +134,55 @@ class SlottedPageHeader(PageHeader):
     self.setFlag(PageHeader.dirtyMask, dirty)
 
   def numTuples(self):
-    raise NotImplementedError
-
+    # if one tuple is occupied, one bit in the bitmaps is marked as 1.
+    return super(SlottedPageHeader, self).numTuples();
+    
   # Returns the space available in the page associated with this header.
   def freeSpace(self):
-    raise NotImplementedError
+    return super(SlottedPageHeader, self).freeSpace();
 
   # Returns the space used in the page associated with this header.
   def usedSpace(self):
-    raise NotImplementedError
-
+    return self.usedSlots() * self.tupleSize;
 
   # Slot operations.
-  def offsetOfSlot(self, slot):
-    raise NotImplementedError
-
-  def hasSlot(self, slotIndex):
-    raise NotImplementedError
-
-  def getSlot(self, slotIndex):
-    raise NotImplementedError
-
-  def setSlot(self, slotIndex, slot):
-    raise NotImplementedError
+  def offsetOfSlot(self, slotIndex):
+    return self.headerSize() + slotIndex * (self.tupleSize - 1);
 
   def resetSlot(self, slotIndex):
-    raise NotImplementedError
-
-  def freeSlots(self):
-    raise NotImplementedError
+    self.slots[ slotIndex ] = 0;
 
   def usedSlots(self):
-    raise NotImplementedError
-
+      
+    slotCount = 0;
+    for index in self.slots:
+        if index != 0:
+            slotCount += 1;
+    return slotCount;
   # Tuple allocation operations.
   
   # Returns whether the page has any free space for a tuple.
   def hasFreeTuple(self):
-    raise NotImplementedError
+    return (len(self.availableSlots) == 0);
 
   # Returns the tupleIndex of the next free tuple.
   # This should also "allocate" the tuple, such that any subsequent call
   # does not yield the same tupleIndex.
   def nextFreeTuple(self):
-    raise NotImplementedError
+      
+    if self.hasFreeTuple():
+        if len(self.availableSlots) > 1:
+            self.nextSlot = self.availableSlots[1];
+            return self.availableSlots.pop(0);
+        else:
+            self.nextSlot = -1;
+            return self.availableSlots.pop(0);
 
   def nextTupleRange(self):
-    raise NotImplementedError
+    
+    if self.hasFreeTuple():
+        slotIndex = self.nextFreeTuple();
+        return (slotIndex, self.offsetOfSlot(slotIndex), self.offsetOfSlot(slotIndex) + self.tupleSize);
 
   # Create a binary representation of a slotted page header.
   # The binary representation should include the slot contents.
