@@ -88,10 +88,10 @@ class SlottedPageHeader(PageHeader):
     if buffer:
       self.tupleSize     = kwargs.get("tupleSize", None);
       self.pageCapacity  = len(buffer);
-      PageHeader.__init__(self, buffer=buffer);
-      self.numSlots   = math.floor( ( self.pageCapacity - 2 * 2 )  / float( self.tupleSize + 0.125 ) )  # every bit takes 1/8 byte.
+      #PageHeader.__init__(self, buffer=buffer);
+      self.numSlots      = math.floor( ( self.pageCapacity - 2 * 2 )  / float( self.tupleSize + 0.125 ) )  # every bit takes 1/8 byte.
       
-      # We keep an array of slots which should be lazily updated. 
+      # We keep an array of slots which should be updated. 
       self.slots            = [0 for x in range(0, self.numSlots)];
       
       # We implements a queue by list for availableSlots.
@@ -104,7 +104,7 @@ class SlottedPageHeader(PageHeader):
           self.availableSlots.append(index);
           
       # We write to buffer
-      buffer[0:self.headerSize()] = self.pack();
+      # buffer[0:self.headerSize()] = self.pack();
 
     else:
       raise ValueError("No backing buffer supplied for SlottedPageHeader")
@@ -113,10 +113,11 @@ class SlottedPageHeader(PageHeader):
     return (    self.flags == other.flags
             and self.tupleSize == other.tupleSize
             and self.pageCapacity == other.pageCapacity
-            and self.nextSlot  == other.nextSlot )
+            and self.nextSlot  == other.nextSlot
+            and self.slots     == other.slots )
 
   def __hash__(self):
-    return hash((self.flags, self.tupleSize, self.pageCapacity, self.nextSlot))
+    return hash((self.flags, self.tupleSize, self.pageCapacity, self.nextSlot, self.hashSlotsHelper()))
 
   def headerSize(self):
     return 2 + 2 + self.slotBufferLength; 
@@ -164,28 +165,22 @@ class SlottedPageHeader(PageHeader):
         if index != 0:
             slotCount += 1;
     return slotCount;
-
-  # Call this function to update our self.slots object;
-  def updateSlots(self):
-    
-    for index in (0, self.numSlots):
-        self.slots[index] = 1;
-    
-    for index in self.availableSlots:
-        self.slots[index] = 0;
     
   # Tuple allocation operations.
   
   # Returns whether the page has any free space for a tuple.
   def hasFreeTuple(self):
-    return (len(self.availableSlots) == 0);
+    return (len(self.availableSlots) != 0);
 
   # Returns the tupleIndex of the next free tuple.
   # This should also "allocate" the tuple, such that any subsequent call
   # does not yield the same tupleIndex.
   def nextFreeTuple(self):
-      
+    
     if self.hasFreeTuple():
+        # update slots
+        self.slots[self.nextSlot] = 1;
+        
         if len(self.availableSlots) > 1:
             self.nextSlot = self.availableSlots[1];
             return self.availableSlots.pop(0);
@@ -213,21 +208,54 @@ class SlottedPageHeader(PageHeader):
         if i == 0:
             bitSlot = self.slots[0];
             count8  = 0;
-        elif mod8(i) and i != 0:
+        elif self.mod8(i) and i != 0 and i != (self.numSlots - 1):
             packedHeader += Struct("B").pack(bitSlot);
             bitSlot = self.slots[i];
             count8  = 0;
         else:
             count8  += 1;
-            bitSlot |= ( self.slots[i] << count8 ); 
+            bitSlot |= ( self.slots[i] << count8 );
+            if i == self.numSlots - 1:
+               packedHeader += Struct("B").pack(bitSlot);
     
     return packedHeader;
 
   # Create a slotted page header instance from a binary representation held in the given buffer.
   @classmethod
   def unpack(cls, buffer):
+
+    values    = Struct("HH").unpack_from(buffer);
+    numSlots  = values[0];
+    nextSlot  = values[1];
+    tupleSize = len(buffer) / numSlots;
+    ph        = cls(buffer=buffer, tupleSize=tupleSize);
+    ph.numSlots = numSlots;
+    ph.nextSlot = nextSlot;
     
-    return 0;
+    count     = 0;
+    
+    # reconstructing slots
+    for i in range(4, ph.headerSize()):
+        
+        count8 = 0;
+        q = buffer[i];
+        while count8 < 8:
+           ph.slots[ count ] = q | 0;
+           q      >>= 1;
+           count8 +=  1;
+           count  +=  1; 
+        
+           if count > ph.numSlots:
+              break;
+        
+        continue;
+    
+    # reconstructing available slots;
+    for i in range(0, ph.numSlots):
+        if ph.slots[i] == 0:
+            ph.availableSlots.append(i);
+            
+    return ph;
 
   # We implement a function that can returns whether index mod 8 = 0?
   def mod8(self, index):
@@ -236,6 +264,13 @@ class SlottedPageHeader(PageHeader):
        return True;
     else:
        return False;
+   
+  def hashSlotsHelper(self):
+    
+    slots = '';
+    for i in range(0, self.numSlots):
+        slots += self.slots[i];
+    return slots;
 
 
 
