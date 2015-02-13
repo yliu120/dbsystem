@@ -104,7 +104,7 @@ class SlottedPageHeader(PageHeader):
           self.availableSlots.append(index);
           
       # We write to buffer
-      # buffer[0:self.headerSize()] = self.pack();
+      buffer[0:self.headerSize()] = self.pack();
 
     else:
       raise ValueError("No backing buffer supplied for SlottedPageHeader")
@@ -227,7 +227,7 @@ class SlottedPageHeader(PageHeader):
     values    = Struct("HH").unpack_from(buffer);
     numSlots  = values[0];
     nextSlot  = values[1];
-    tupleSize = len(buffer) / numSlots;
+    tupleSize = int(len(buffer) / numSlots);
     ph        = cls(buffer=buffer, tupleSize=tupleSize);
     ph.numSlots = numSlots;
     ph.nextSlot = nextSlot;
@@ -245,12 +245,13 @@ class SlottedPageHeader(PageHeader):
            count8 +=  1;
            count  +=  1; 
         
-           if count > ph.numSlots:
+           if count >= ph.numSlots:
               break;
         
         continue;
     
     # reconstructing available slots;
+    ph.availableSlots = [];
     for i in range(0, ph.numSlots):
         if ph.slots[i] == 0:
             ph.availableSlots.append(i);
