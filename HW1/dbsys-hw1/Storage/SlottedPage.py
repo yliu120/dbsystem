@@ -281,7 +281,7 @@ class SlottedPageHeader(PageHeader):
 # DESIGN QUESTION 2: should this inherit from Page?
 # If so, what methods can we reuse from the parent?
 #
-class SlottedPage(BytesIO):
+class SlottedPage(Page):
   """
   A slotted page implementation.
 
@@ -476,13 +476,13 @@ class SlottedPage(BytesIO):
   # This should refresh the binary representation of the page header contained
   # within the page by packing the header in place.
   def pack(self):
-    raise NotImplementedError
+    return super(SlottedPage, self).pack();
 
   # Creates a Page instance from the binary representation held in the buffer.
   # The pageId of the newly constructed Page instance is given as an argument.
   @classmethod
   def unpack(cls, pageId, buffer):
-    raise NotImplementedError
+    return super(SlottedPage, self).unpack(pageId, buffer);
 
 
 if __name__ == "__main__":
