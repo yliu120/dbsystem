@@ -233,7 +233,7 @@ class StorageFile:
   #
   # Constructors keyword arguments:
   # bufferPool   : a buffer pool instance.
-  # fileId       : a PageId instance identifying this page.
+  # fileId       : a FileId instance identifying this file.
   # filePath     : a PageHeader instance.
   # mode         : the file open mode. Can be one of 'create', 'update', 'truncate'.
   # Also, any keyword arguments needed to construct a FileHeader.
@@ -252,18 +252,41 @@ class StorageFile:
 
     ######################################################################################
     # DESIGN QUESTION: how do you initialize these?
-    # The file should be opened depending on the desired mode of operation.
-    # The file header may come from the file contents (i.e., if the file already exists),
+    # 1) The file should be opened depending on the desired mode of operation.
+    # ANS: Python file operations:
+    # if you want to just append to an existing file, use the append
+    # mode:
+
+    # f = open(your_file, 'a')
+    # if you want to both read *and* write to your existing file, use
+    # update mode:
+
+    # f = open(your_file, 'r+')
+
+    # the '+' means open the file for reading and writing, i.e.
+    # update.  ('w+' means delete the existing file and open a new
+    # one for read and write so be careful!) anyway, once you open
+    # the file, you can use f.seek() and f.tell() to navigate within
+    # the file.  if you are going to read and write to your file,
+    # make sure you explicitly f.flush() between change of operations.
+    
+    # 2) The file header may come from the file contents (i.e., if the file already exists),
     # otherwise it should be created from scratch.
-    self.header    = None
-    self.file      = None
+    
+    if mode == "create" :
+        self.file   = open( self.filePath, 'wb+' );
+        self.header = FileHeader(pageSize=pageSize, pageClass=pageClass, schema=schema);
+    elif mode == "update" or mode == "truncate" :
+        self.file   = open( self.filePath, 'rb+' );
+        self.header = FileHeader.fromFile( self.file );
+    else:
+        raise ValueError("Storage.StorageFile: Constructor -> mode input invalid.")
 
     ######################################################################################
     # DESIGN QUESTION: what data structure do you use to keep track of the free pages?
-    self.freePages = None
-    
-    raise NotImplementedError
-
+    # ANS            : QUEUE - needed to be reconstructed by unpack()
+    self.freePages = []
+    self.numPages  = 0;
 
   # File control
   def flush(self):
@@ -290,10 +313,10 @@ class StorageFile:
     return os.path.getsize(self.filePath)
 
   def headerSize(self):
-    raise NotImplementedError
+    return self.header;
 
   def numPages(self):
-    raise NotImplementedError
+    return self.numPages;
 
   # Returns the offset in the file corresponding to the given page id.
   # Notice this assumes the header is written before the first page,
@@ -304,7 +327,6 @@ class StorageFile:
   # Returns whether the given page id is valid for this file.
   def validPageId(self, pageId):
     return pageId.fileId == self.fileId and pageId.pageIndex < self.numPages()
-
 
   # Page header operations
 
