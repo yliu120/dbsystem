@@ -418,15 +418,17 @@ class SlottedPage(Page):
 
   # Tuple iterator.
   def __iter__(self):
+      
     self.usedSlots    = self.header.usedSlots();
     self.iterTupleIdx = 0;
     return self
 
   def __next__(self):
-    t = self.getTuple(TupleId(self.pageId, self.usedSlots[self.iterTupleIdx]))
-    if t:
-      self.iterTupleIdx += 1;
-      return t
+      
+    if self.iterTupleIdx < len(self.usedSlots):
+        t = self.getTuple(TupleId(self.pageId, self.usedSlots[self.iterTupleIdx]));
+        self.iterTupleIdx += 1;
+        return t;
     else:
       raise StopIteration
 
