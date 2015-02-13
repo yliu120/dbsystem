@@ -149,7 +149,7 @@ class SlottedPageHeader(PageHeader):
 
   # Returns the space used in the page associated with this header.
   def usedSpace(self):
-    return self.usedSlots() * self.tupleSize;
+    return len(self.usedSlots()) * self.tupleSize;
 
   # Slot operations.
   def offsetOfSlot(self, slotIndex):
@@ -160,11 +160,13 @@ class SlottedPageHeader(PageHeader):
 
   def usedSlots(self):
       
-    slotCount = 0;
-    for index in self.slots:
-        if index != 0:
-            slotCount += 1;
-    return slotCount;
+    usedSlots = [];
+    index     = 0;
+    for slot in self.slots:
+        if slot != 0:
+            usedSlots.append(index);
+        index += 1;
+    return usedSlots;
     
   # Tuple allocation operations.
   
@@ -279,7 +281,7 @@ class SlottedPageHeader(PageHeader):
 # DESIGN QUESTION 2: should this inherit from Page?
 # If so, what methods can we reuse from the parent?
 #
-class SlottedPage:
+class SlottedPage(BytesIO):
   """
   A slotted page implementation.
 
@@ -387,6 +389,7 @@ class SlottedPage:
   # schema       : the schema for tuples to be stored in the page.
   # Also, any keyword arguments needed to construct a SlottedPageHeader.
   def __init__(self, **kwargs):
+
     buffer = kwargs.get("buffer", None)
     if buffer:
       BytesIO.__init__(self, buffer)
@@ -400,8 +403,6 @@ class SlottedPage:
         self.header = self.initializeHeader(**kwargs)
       else:
         raise ValueError("No page identifier provided to page constructor.")
-      
-      raise NotImplementedError
 
     else:
       raise ValueError("No backing buffer provided to page constructor.")
@@ -417,32 +418,56 @@ class SlottedPage:
 
   # Tuple iterator.
   def __iter__(self):
-    raise NotImplementedError
+    self.usedSlots    = self.header.usedSlots();
+    self.iterTupleIdx = 0;
+    return self
 
   def __next__(self):
-    raise NotImplementedError
+    t = self.getTuple(TupleId(self.pageId, self.usedSlots[self.iterTupleIdx]))
+    if t:
+      self.iterTupleIdx += 1;
+      return t
+    else:
+      raise StopIteration
 
   # Tuple accessor methods
 
   # Returns a byte string representing a packed tuple for the given tuple id.
   def getTuple(self, tupleId):
-    raise NotImplementedError
+      
+    slotIndex = tupleId.tupleIndex;
+    start     = self.header.offsetOfSlot(slotIndex);
+    return self.getvalue()[start:(start + self.header.tupleSize)];
 
   # Updates the (packed) tuple at the given tuple id.
   def putTuple(self, tupleId, tupleData):
-    raise NotImplementedError
+      
+    slotIndex = tupleId.tupleIndex;
+    start     = self.header.offsetOfSlot(slotIndex);
+    self.getbuffer()[start:(start + self.header.tupleSize)] = tupleData;
 
   # Adds a packed tuple to the page. Returns the tuple id of the newly added tuple.
   def insertTuple(self, tupleData):
-    raise NotImplementedError
+      
+    if self.header.hasFreeTuple():
+        slotIndex = self.header.nextFreeTuple();
+        tupleIndex = self.header.offsetOfSlot(slotIndex);
+        self.getbuffer()[tupleIndex:(tupleIndex+self.header.tupleSize)] = tupleData;
+        return TupleId(self.pageId, self.header.numTuples() - 1);
+    else:
+        raise ValueError("This page is full!");
 
   # Zeroes out the contents of the tuple at the given tuple id.
   def clearTuple(self, tupleId):
-    raise NotImplementedError
+      
+    slotIndex = tupleId.tupleIndex;
+    start     = self.header.offsetOfSlot(slotIndex);
+    self.getbuffer()[start:(start + self.header.tupleSize)] = bytearray(b'\x00' * self.header.tupleSize);
 
   # Removes the tuple at the given tuple id, shifting subsequent tuples.
   def deleteTuple(self, tupleId):
-    raise NotImplementedError
+      
+    self.clearTuple(tupleId);
 
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained
