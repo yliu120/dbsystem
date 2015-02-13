@@ -153,7 +153,7 @@ class SlottedPageHeader(PageHeader):
 
   # Slot operations.
   def offsetOfSlot(self, slotIndex):
-    return self.headerSize() + slotIndex * (self.tupleSize - 1);
+    return self.headerSize() + slotIndex  * self.tupleSize;
 
   def resetSlot(self, slotIndex):
     self.slots[ slotIndex ] = 0;
