@@ -453,7 +453,7 @@ class SlottedPage(BytesIO):
         slotIndex = self.header.nextFreeTuple();
         tupleIndex = self.header.offsetOfSlot(slotIndex);
         self.getbuffer()[tupleIndex:(tupleIndex+self.header.tupleSize)] = tupleData;
-        return TupleId(self.pageId, self.header.numTuples() - 1);
+        return TupleId(self.pageId, slotIndex);
     else:
         raise ValueError("This page is full!");
 
@@ -467,7 +467,10 @@ class SlottedPage(BytesIO):
   # Removes the tuple at the given tuple id, shifting subsequent tuples.
   def deleteTuple(self, tupleId):
       
+    slotIndex = tupleId.tupleIndex;
     self.clearTuple(tupleId);
+    self.header.availableSlots.append( slotIndex );
+    self.header.slots[ slotIndex ] = 0;
 
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained
