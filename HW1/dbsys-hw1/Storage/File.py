@@ -274,7 +274,7 @@ class StorageFile:
     # otherwise it should be created from scratch.
     
     if mode == "create" :
-        self.file   = open( self.filePath, 'wb+' );
+        self.file   = open( self.filePath, 'wb' );
         self.header = FileHeader(pageSize=pageSize, pageClass=pageClass, schema=schema);
     elif mode == "update" or mode == "truncate" :
         self.file   = open( self.filePath, 'rb+' );
@@ -332,7 +332,13 @@ class StorageFile:
 
   # Reads a page header from disk.
   def readPageHeader(self, pageId):
-    raise NotImplementedError
+    
+    # Set the file handle to the correct page 
+    if validPageId( pageId ): 
+        offset = self.pageOffset(pageId);
+        self.file.seek( offset );
+    else:
+        raise ValueError("Storage.StorageFile -> pageId out of range. (pid: " + str(pageId.pageIndex) + ")" );
 
   # Writes a page header to disk.
   # The page must already exist, that is we cannot extend the file with only a page header.
