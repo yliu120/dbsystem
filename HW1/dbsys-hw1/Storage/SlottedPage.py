@@ -484,7 +484,7 @@ class SlottedPage(Page):
   # The pageId of the newly constructed Page instance is given as an argument.
   @classmethod
   def unpack(cls, pageId, buffer):
-    return super(SlottedPage, self).unpack(pageId, buffer);
+    return super(SlottedPage, cls).unpack(pageId, buffer);
 
 
 if __name__ == "__main__":
