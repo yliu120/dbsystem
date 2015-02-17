@@ -209,19 +209,17 @@ class SlottedPageHeader(PageHeader):
     for i in range(0, self.numSlots):
         if i == 0:
             bitSlot = self.slots[0];
-        elif self.mod8(i) and i != 0 and i != (self.numSlots - 1):
+            
+        elif self.mod8(i) and i != 0:
             packedHeader += Struct("B").pack(bitSlot);
             bitSlot = self.slots[i];
             count8  = 0;
         else:
-            if self.mod8(i) and i == (self.numSlots - 1):
-               bitSlot      =  self.slots[i];
-               packedHeader += Struct("B").pack(bitSlot);
-            else:   
-               count8  += 1;
-               bitSlot |= ( self.slots[i] << count8 );
-               if i == self.numSlots - 1:
-                  packedHeader += Struct("B").pack(bitSlot);
+            count8  += 1;
+            bitSlot |= ( self.slots[i] << count8 );
+            
+        if i == (self.numSlots - 1):
+            packedHeader += Struct("B").pack(bitSlot);
     
     return packedHeader;
 
