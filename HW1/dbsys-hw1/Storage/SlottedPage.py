@@ -209,16 +209,19 @@ class SlottedPageHeader(PageHeader):
     for i in range(0, self.numSlots):
         if i == 0:
             bitSlot = self.slots[0];
-            count8  = 0;
         elif self.mod8(i) and i != 0 and i != (self.numSlots - 1):
             packedHeader += Struct("B").pack(bitSlot);
             bitSlot = self.slots[i];
             count8  = 0;
         else:
-            count8  += 1;
-            bitSlot |= ( self.slots[i] << count8 );
-            if i == self.numSlots - 1:
+            if self.mod8(i) and i == (self.numSlots - 1):
+               bitSlot      =  self.slots[i];
                packedHeader += Struct("B").pack(bitSlot);
+            else:   
+               count8  += 1;
+               bitSlot |= ( self.slots[i] << count8 );
+               if i == self.numSlots - 1:
+                  packedHeader += Struct("B").pack(bitSlot);
     
     return packedHeader;
 
@@ -260,7 +263,7 @@ class SlottedPageHeader(PageHeader):
             
     return ph;
 
-  # We implement a function that can returns whether index mod 8 = 0?
+  # We implement a function that can return whether index mod 8 = 0?
   def mod8(self, index):
     
     if ((index & 1 == 0) and ((index >> 1) & 1) == 0 and ((index >> 2) & 1) == 0 ):
