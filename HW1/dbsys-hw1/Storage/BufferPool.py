@@ -80,7 +80,7 @@ class BufferPool:
   # Buffer pool operations
 
   def hasPage(self, pageId):
-    raise NotImplementedError
+    return self.backward.has_key( pageId );
   
   def getPage(self, pageId):
     raise NotImplementedError
