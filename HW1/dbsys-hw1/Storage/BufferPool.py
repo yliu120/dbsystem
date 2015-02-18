@@ -46,14 +46,14 @@ class BufferPool:
     # Buffer Pool Frames
     # Dictionary : offset -> (pId, pin number)
     # ? We can keep a backward mapping as well
-    self.frames       = {x : (None, 0) for x in range(0, self.pageSize * self.numPages(), self.pageSize)};
+    self.frames       = {x : None for x in range(0, self.poolSize, self.pageSize)};
     self.backward     = dict();
     
     # Use a queue to store freeList
     self.freeList     = self.frames.keys();
     
     # Buffer Pool replacement queue ( Least Recently Used )
-    self.replaceQ     = []
+    self.replaceQ     = OrderedDict();
 
 
   def setFileManager(self, fileMgr):
@@ -83,22 +83,51 @@ class BufferPool:
     return self.backward.has_key( pageId );
   
   def getPage(self, pageId):
-    raise NotImplementedError
-
+      
+    if self.hasPage(pageId):
+       # Here we only have one requestor, no need to pin the page       
+       # update replacement ordered dictionary
+       self.replaceQ.move_to_end(pageId, last = True);
+       
+       # return page object to requestor
+       return self.frames[ self.backward(pageId) ];
+    
+    else:
+       # Cache miss
+       if self.freeList is []:
+          self.evictPage();
+          # Here we are not thinking of concurrency problem.
+          # Then by the algorithm, now we should have 1 element in the freeList
+          # read the page to pool buffer:
+          buffer = self.pool.getbuffer()[ self.freeList[0] : (self.freeList[0] + self.pageSize) ];
+          page   = self.fileMgr.readPage(pageId, buffer);
+          
+       
+           
   # Removes a page from the page map, returning it to the free 
   # page list without flushing the page to the disk.
   def discardPage(self, pageId):
-    raise NotImplementedError
+    
+    self.freeList.append( self.backward[pageId] );
+    self.backward.pop(pageId, None);
+    self.replaceQ.pop(pageId);
 
   def flushPage(self, pageId):
-    raise NotImplementedError
+    self.fileMgr.writePage(pageId);
 
   # Evict using LRU policy. 
   # We implement LRU through the use of an OrderedDict, and by moving pages
   # to the end of the ordering every time it is accessed through getPage()
   def evictPage(self):
-    raise NotImplementedError
-
+      
+    pageId = self.replaceQ.popitem(last=False);
+    # Note that we don't need to check the pin of pageId here
+    self.freeList.append( self.backward[ pageId] );
+    # We write the evicted page back to the disk;
+    self.flushPage(pageId);
+    # Maintain our data structure
+    self.backward.pop(pageId, None);
+    
 
 if __name__ == "__main__":
     import doctest

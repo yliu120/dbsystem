@@ -149,7 +149,6 @@ class FileManager:
     fId = self.relationFiles.get(relId, None) if relId else None
     return (fId, self.fileMap.get(fId, None)) if fId else (None, None)
 
-
   # Page operations
   def readPage(self, pageId, pageBuffer):
     rFile = self.fileMap.get(pageId.fileId, None) if pageId else None
