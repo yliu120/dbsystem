@@ -448,6 +448,7 @@ class SlottedPage(Page):
     slotIndex = tupleId.tupleIndex;
     start     = self.header.offsetOfSlot(slotIndex);
     self.getbuffer()[start:(start + self.header.tupleSize)] = tupleData;
+    self.header.setDirty( true );
 
   # Adds a packed tuple to the page. Returns the tuple id of the newly added tuple.
   def insertTuple(self, tupleData):
@@ -456,6 +457,7 @@ class SlottedPage(Page):
         slotIndex = self.header.nextFreeTuple();
         tupleIndex = self.header.offsetOfSlot(slotIndex);
         self.getbuffer()[tupleIndex:(tupleIndex+self.header.tupleSize)] = tupleData;
+        self.header.setDirty( true );
         return TupleId(self.pageId, slotIndex);
     else:
         raise ValueError("This page is full!");
@@ -466,7 +468,8 @@ class SlottedPage(Page):
     slotIndex = tupleId.tupleIndex;
     start     = self.header.offsetOfSlot(slotIndex);
     self.getbuffer()[start:(start + self.header.tupleSize)] = bytearray(b'\x00' * self.header.tupleSize);
-
+    self.header.setDirty( true );
+    
   # Removes the tuple at the given tuple id, shifting subsequent tuples.
   def deleteTuple(self, tupleId):
       
@@ -474,6 +477,7 @@ class SlottedPage(Page):
     self.clearTuple(tupleId);
     self.header.availableSlots.append( slotIndex );
     self.header.slots[ slotIndex ] = 0;
+    self.header.setDirty( true );
 
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained

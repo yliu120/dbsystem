@@ -277,14 +277,14 @@ class StorageFile:
         self.file   = open( self.filePath, 'b+w' );
         self.header = FileHeader(pageSize=pageSize, pageClass=pageClass, schema=schema);
     elif mode == "update" or mode == "truncate" :
-        self.file   = open( self.filePath, 'rb+' );
+        self.file   = open( self.filePath, 'b+r' );
         self.header = FileHeader.fromFile( self.file );
     else:
         raise ValueError("Storage.StorageFile: Constructor -> mode input invalid.")
 
     ######################################################################################
     # DESIGN QUESTION: what data structure do you use to keep track of the free pages?
-    # ANS            : QUEUE - needed to be reconstructed by unpack()
+    # ANS            : QUEUE - need to be reconstructed by unpack()
     self.freePages = []
     self.pageNum  = 0;
 

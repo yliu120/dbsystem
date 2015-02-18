@@ -42,7 +42,12 @@ class BufferPool:
 
     ####################################################################################
     # DESIGN QUESTION: what other data structures do we need to keep in the buffer pool?
-    self.freeList     = None
+    self.freeList     = [] 
+    # Buffer Pool Frames
+    # Dictionary : offset -> pin number
+    self.frames       = {x : 0 for x in range(0, self.pageSize * self.numPages(), self.pageSize)};
+    # Buffer Pool replacement queue ( Least Recently Used )
+    self.replaceQ     = []
 
 
   def setFileManager(self, fileMgr):
@@ -54,7 +59,7 @@ class BufferPool:
     return math.floor(self.poolSize / self.pageSize)
 
   def numFreePages(self):
-    raise NotImplementedError
+    raise 
 
   def size(self):
     return self.poolSize
