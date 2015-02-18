@@ -42,10 +42,16 @@ class BufferPool:
 
     ####################################################################################
     # DESIGN QUESTION: what other data structures do we need to keep in the buffer pool?
-    self.freeList     = [] 
+    
     # Buffer Pool Frames
-    # Dictionary : offset -> pin number
-    self.frames       = {x : 0 for x in range(0, self.pageSize * self.numPages(), self.pageSize)};
+    # Dictionary : offset -> (pId, pin number)
+    # ? We can keep a backward mapping as well
+    self.frames       = {x : (None, 0) for x in range(0, self.pageSize * self.numPages(), self.pageSize)};
+    self.backward     = dict();
+    
+    # Use a queue to store freeList
+    self.freeList     = self.frames.keys();
+    
     # Buffer Pool replacement queue ( Least Recently Used )
     self.replaceQ     = []
 
@@ -59,7 +65,7 @@ class BufferPool:
     return math.floor(self.poolSize / self.pageSize)
 
   def numFreePages(self):
-    raise 
+    return len( self.freeList ); 
 
   def size(self):
     return self.poolSize
