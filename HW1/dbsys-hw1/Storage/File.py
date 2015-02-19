@@ -335,10 +335,10 @@ class StorageFile:
     
     # Set the file handle to the correct page 
     if self.validPageId( pageId ): 
-        offset = self.pageOffset(pageId);
+        offset = self.pageOffset( pageId );
         self.file.seek( offset );
         buffer = io.BytesIO( self.file.read( self.pageSize() ) );
-        return self.pageClass().headerClass( pageId, buffer );
+        return self.pageClass().headerClass( buffer=buffer.getbuffer(), tupleSize=self.schema().size );
     else:
         raise ValueError("Storage.StorageFile -> pageId out of range. (pid: " + str(pageId.pageIndex) + ")" );
 
