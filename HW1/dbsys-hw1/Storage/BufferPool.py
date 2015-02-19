@@ -88,9 +88,6 @@ class BufferPool:
        # Here we only have one requestor, no need to pin the page       
        # update replacement ordered dictionary
        self.replaceQ.move_to_end(pageId, last = True);
-       
-       # return page object to requestor
-       return self.frames[ self.backward[pageId] ];
     
     else:
        # Cache miss
@@ -114,6 +111,9 @@ class BufferPool:
           self.frames  [ offset ] = page;
           self.backward[ pageId ] = offset;
           self.replaceQ.update({pageId : offset});
+          
+    # Overall we need to return
+    return self.frames[ self.backward[pageId] ];
        
            
   # Removes a page from the page map, returning it to the free 
