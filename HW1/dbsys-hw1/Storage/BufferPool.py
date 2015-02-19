@@ -80,7 +80,7 @@ class BufferPool:
   # Buffer pool operations
 
   def hasPage(self, pageId):
-    return self.backward.has_key( pageId );
+    return (pageId in self.backward);
   
   def getPage(self, pageId):
       
