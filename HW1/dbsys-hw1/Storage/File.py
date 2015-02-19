@@ -418,12 +418,13 @@ class StorageFile:
     buffer    = self.file.read( self.pageSize() );
     page      = self.pageClass().unpack( avaPageID, buffer );
     
-    page.insertTuple( tupleData );
+    tupleId   = page.insertTuple( tupleData );
     self.writePage(page);
-    if page.header.hasFreeTuple():
-        return;
-    else:
-        self.freePages.pop(0);
+    
+    if not page.header.hasFreeTuple():
+       self.freePages.pop(0);
+       
+    return tupleId;
         
   # Removes the tuple by its id, tracking if the page is now free
   def deleteTuple(self, tupleId):
