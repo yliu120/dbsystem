@@ -334,7 +334,7 @@ class StorageFile:
   def readPageHeader(self, pageId):
     
     # Set the file handle to the correct page 
-    if validPageId( pageId ): 
+    if self.validPageId( pageId ): 
         offset = self.pageOffset(pageId);
         self.file.seek( offset );
         buffer = io.BytesIO( self.file.read( self.pageSize() ) );

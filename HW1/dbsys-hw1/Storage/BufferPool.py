@@ -50,7 +50,7 @@ class BufferPool:
     self.backward     = dict();
     
     # Use a queue to store freeList
-    self.freeList     = self.frames.keys();
+    self.freeList     = list( self.frames.keys() );
     
     # Buffer Pool replacement queue ( Least Recently Used )
     self.replaceQ     = OrderedDict();
@@ -90,7 +90,7 @@ class BufferPool:
        self.replaceQ.move_to_end(pageId, last = True);
        
        # return page object to requestor
-       return self.frames[ self.backward(pageId) ];
+       return self.frames[ self.backward[pageId] ];
     
     else:
        # Cache miss
