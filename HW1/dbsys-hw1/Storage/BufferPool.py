@@ -101,7 +101,19 @@ class BufferPool:
           # read the page to pool buffer:
           buffer = self.pool.getbuffer()[ self.freeList[0] : (self.freeList[0] + self.pageSize) ];
           page   = self.fileMgr.readPage(pageId, buffer);
-          
+          # add page to our datastructure
+          self.frames  [ self.freeList[0] ] = page;
+          self.backward[ pageId ]           = self.freeList[0];
+          self.replaceQ.update({pageId : self.freelist[0]});
+          self.freelist.pop(0);
+       else:
+          offset = self.freeList.pop(0);
+          buffer = self.pool.getbuffer()[ offset : (offset + self.pageSize) ];
+          page   = self.fileMgr.readPage(pageId, buffer);
+          # Maintain datastructures
+          self.frames  [ offset ] = page;
+          self.backward[ pageId ] = offset;
+          self.replaceQ.update({pageId : offset});
        
            
   # Removes a page from the page map, returning it to the free 
@@ -120,9 +132,9 @@ class BufferPool:
   # to the end of the ordering every time it is accessed through getPage()
   def evictPage(self):
       
-    pageId = self.replaceQ.popitem(last=False);
+    (pageId, offset) = self.replaceQ.popitem(last=False);
     # Note that we don't need to check the pin of pageId here
-    self.freeList.append( self.backward[ pageId] );
+    self.freeList.append( offset );
     # We write the evicted page back to the disk;
     self.flushPage(pageId);
     # Maintain our data structure
