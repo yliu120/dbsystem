@@ -483,7 +483,7 @@ class Page(BytesIO):
   @classmethod
   def unpack(cls, pageId, buffer):
       
-    header = PageHeader.unpack( BytesIO(buffer).getbuffer() );
+    header = cls.headerClass.unpack( BytesIO(buffer).getbuffer() );
     return cls(pageId=pageId, buffer=buffer, header=header);
 
 if __name__ == "__main__":
