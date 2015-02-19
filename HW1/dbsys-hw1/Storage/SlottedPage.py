@@ -90,7 +90,7 @@ class SlottedPageHeader(PageHeader):
       self.tupleSize     = kwargs.get("tupleSize", None);
       self.pageCapacity  = len(buffer);
       #PageHeader.__init__(self, buffer=buffer);
-      self.numSlots      = math.floor( ( self.pageCapacity - 2 * 2 )  / float( self.tupleSize + 0.125 ) )  # every bit takes 1/8 byte.
+      self.numSlots      = math.floor( ( self.pageCapacity - 2 * 3 )  / float( self.tupleSize + 0.125 ) )  # every bit takes 1/8 byte.
       
       # We keep an array of slots which should be updated. 
       self.slots            = [0 for x in range(0, self.numSlots)];
@@ -122,7 +122,7 @@ class SlottedPageHeader(PageHeader):
     return hash((self.flags, self.tupleSize, self.pageCapacity, self.nextSlot, self.hashSlotsHelper()))
 
   def headerSize(self):
-    return 2 + 2 + self.slotBufferLength; 
+    return 2 + 2 + 2 + self.slotBufferLength; 
 
   # Flag operations.
   def flag(self, mask):
@@ -174,7 +174,7 @@ class SlottedPageHeader(PageHeader):
   
   # Returns whether the page has any free space for a tuple.
   def hasFreeTuple(self):
-    return (len(self.availableSlots) != 0);
+    return (len(self.availableSlots) > 0);
 
   # Returns the tupleIndex of the next free tuple.
   # This should also "allocate" the tuple, such that any subsequent call
@@ -189,7 +189,7 @@ class SlottedPageHeader(PageHeader):
             self.nextSlot = self.availableSlots[1];
             return self.availableSlots.pop(0);
         else:
-            self.nextSlot = -1;
+            self.nextSlot = self.numSlots;
             return self.availableSlots.pop(0);
 
   def nextTupleRange(self):
@@ -202,7 +202,9 @@ class SlottedPageHeader(PageHeader):
   # The binary representation should include the slot contents.
   def pack(self):
     
-    packedHeader = Struct("HH").pack(self.numSlots, self.nextSlot);
+    print("numSlots: " + str(self.numSlots));
+    print("nextSlots: "+ str(self.nextSlot));
+    packedHeader = Struct("HHH").pack(self.numSlots, self.nextSlot, self.tupleSize);
     
     # Next, we packed our slot buffer to bits
     bitSlot = 0
@@ -229,18 +231,19 @@ class SlottedPageHeader(PageHeader):
   @classmethod
   def unpack(cls, buffer):
 
-    values    = Struct("HH").unpack_from(buffer);
+    values    = Struct("HHH").unpack_from(buffer);
     numSlots  = values[0];
     nextSlot  = values[1];
-    tupleSize = int(len(buffer) / numSlots);
+    tupleSize = values[2];
     ph        = cls(buffer=buffer, tupleSize=tupleSize, reconstruct=True);
     ph.numSlots = numSlots;
     ph.nextSlot = nextSlot;
+    ph.tupleSize = tupleSize;
     
     count     = 0;
     
     # reconstructing slots
-    for i in range(4, ph.headerSize()):
+    for i in range(6, ph.headerSize()):
         
         count8 = 0;
         q = buffer[i];
@@ -459,6 +462,7 @@ class SlottedPage(Page):
         slotIndex = self.header.nextFreeTuple();
         tupleIndex = self.header.offsetOfSlot(slotIndex);
         self.getbuffer()[tupleIndex:(tupleIndex+self.header.tupleSize)] = tupleData;
+
         self.header.setDirty( True );
         return TupleId(self.pageId, slotIndex);
     else:
