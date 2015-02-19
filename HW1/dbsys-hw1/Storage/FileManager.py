@@ -134,7 +134,7 @@ class FileManager:
     rFile = self.fileMap.pop(fId, None) if fId else None
     if rFile:
       rFile.close()
-      os.remove(rFile.path)
+      os.remove(rFile.filePath)
       self.checkpoint()
 
   # Removes a relation from the file manager without closing
