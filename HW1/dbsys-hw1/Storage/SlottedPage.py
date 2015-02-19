@@ -85,6 +85,7 @@ class SlottedPageHeader(PageHeader):
 
     buffer     = kwargs.get("buffer", None)
     self.flags = kwargs.get("flags", b'\x00')
+    recons     = kwargs.get("reconstruct", False);
     if buffer:
       self.tupleSize     = kwargs.get("tupleSize", None);
       self.pageCapacity  = len(buffer);
@@ -104,7 +105,8 @@ class SlottedPageHeader(PageHeader):
           self.availableSlots.append(index);
           
       # We write to buffer
-      buffer[0:self.headerSize()] = self.pack();
+      if not recons:
+          buffer[0:self.headerSize()] = self.pack();
 
     else:
       raise ValueError("No backing buffer supplied for SlottedPageHeader")
@@ -231,7 +233,7 @@ class SlottedPageHeader(PageHeader):
     numSlots  = values[0];
     nextSlot  = values[1];
     tupleSize = int(len(buffer) / numSlots);
-    ph        = cls(buffer=buffer, tupleSize=tupleSize);
+    ph        = cls(buffer=buffer, tupleSize=tupleSize, reconstruct=True);
     ph.numSlots = numSlots;
     ph.nextSlot = nextSlot;
     
@@ -243,7 +245,7 @@ class SlottedPageHeader(PageHeader):
         count8 = 0;
         q = buffer[i];
         while count8 < 8:
-           ph.slots[ count ] = q | 0;
+           ph.slots[ count ] = q & 1;
            q      >>= 1;
            count8 +=  1;
            count  +=  1; 

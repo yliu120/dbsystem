@@ -179,6 +179,19 @@ class StorageFile:
   # Write out pages and sync to disk.
   >>> f.writePage(p)
   >>> f.writePage(p1)
+  
+  # Testing read page header function
+  >>> p.header.usedSpace()
+  80
+  
+  >>> h1 = f.readPageHeader( pId );
+  >>> h2 = f.readPageHeader( pId1 );
+  
+  >>> h1.usedSpace()
+  80
+  >>> h2.usedSpace()
+  80
+  
   >>> f.flush()
   
   # Check the number of pages, and the file size.
@@ -338,7 +351,7 @@ class StorageFile:
         offset = self.pageOffset( pageId );
         self.file.seek( offset );
         buffer = io.BytesIO( self.file.read( self.pageSize() ) );
-        return self.pageClass().headerClass( buffer=buffer.getbuffer(), tupleSize=self.schema().size );
+        return self.pageClass().headerClass.unpack( buffer.getbuffer() );
     else:
         raise ValueError("Storage.StorageFile -> pageId out of range. (pid: " + str(pageId.pageIndex) + ")" );
 
