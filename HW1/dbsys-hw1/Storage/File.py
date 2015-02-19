@@ -289,8 +289,10 @@ class StorageFile:
     if mode == "create" :
         self.file   = open( self.filePath, 'b+w' );
         self.header = FileHeader(pageSize=pageSize, pageClass=pageClass, schema=schema);
+        self.file.write( self.header.pack() );
+        self.flush();
     elif mode == "update" or mode == "truncate" :
-        self.file   = open( self.filePath, 'b+r' );
+        self.file   = open( self.filePath, 'br+' );
         self.header = FileHeader.fromFile( self.file );
     else:
         raise ValueError("Storage.StorageFile: Constructor -> mode input invalid.")
