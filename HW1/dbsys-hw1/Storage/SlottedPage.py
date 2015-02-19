@@ -202,8 +202,6 @@ class SlottedPageHeader(PageHeader):
   # The binary representation should include the slot contents.
   def pack(self):
     
-    print("numSlots: " + str(self.numSlots));
-    print("nextSlots: "+ str(self.nextSlot));
     packedHeader = Struct("HHH").pack(self.numSlots, self.nextSlot, self.tupleSize);
     
     # Next, we packed our slot buffer to bits

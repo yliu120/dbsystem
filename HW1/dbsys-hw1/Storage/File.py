@@ -384,8 +384,8 @@ class StorageFile:
     if not self.validPageId( pId ):
         self.pageNum += 1;
     # update our freepages data structure
-    if page.header.hasFreeTuple():
-        self.freePages.append(pId.pageIndex);
+        if page.header.hasFreeTuple():
+           self.freePages.append(pId.pageIndex);
 
   # Adds a new page to the file by writing past its end.
   def allocatePage(self):
@@ -393,7 +393,6 @@ class StorageFile:
     pId  = PageId( self.fileId, self.pageNum );
     page = self.pageClass()( pageId=pId, buffer=bytes(self.pageSize()), schema=self.schema() );
     self.file.write( page.pack() );
-    
     # increment page num
     self.pageNum += 1;
     
@@ -418,10 +417,9 @@ class StorageFile:
     self.file.seek( self.pageOffset( avaPageID ));
     buffer    = self.file.read( self.pageSize() );
     page      = self.pageClass().unpack( avaPageID, buffer );
-        
+    
     page.insertTuple( tupleData );
     self.writePage(page);
-    
     if page.header.hasFreeTuple():
         return;
     else:
