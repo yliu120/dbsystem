@@ -422,7 +422,7 @@ class StorageFile:
     page.insertTuple( tupleData );
     self.writePage(page);
     
-    if page.hasFreeTuple():
+    if page.header.hasFreeTuple():
         return;
     else:
         self.freePages.pop(0);
@@ -433,12 +433,12 @@ class StorageFile:
     pId  = tupleId.pageId;
     page = self.readPage(pId, bytes( self.pageSize() ));
     
-    pre  = page.hasFreeTuple();
+    pre  = page.header.hasFreeTuple();
     
     page.deleteTuple( tupleId );
     self.writePage(page);
     
-    if (not pre) and page.hasFreeTuple():
+    if (not pre) and page.header.hasFreeTuple():
         self.freePages.insert(0, pId.pageIndex);
     else:
         return;
