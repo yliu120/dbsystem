@@ -435,12 +435,51 @@ class PaxPage(SlottedPage):
     slotIndex = tupleId.tupleIndex;
     if slotIndex in self.header.slotUsed:
         start     = self.header.offsetOfSlot(slotIndex);
+        tupleSt   = 0;
         for i in range(0, len(self.header.schemaSizes)):
             self.getbuffer()[start[i] : (start[i] + self.header.schemaSizes[i])] = \
-            tupleData[ self.header.schemaSizes[i], self.header.schemaSizes[i+1] ];
+            tupleData[ tupleSt, tupleSt + self.header.schemaSizes[i] ];
+            tupleSt += self.header.schemaSizes[i];
         self.header.setDirty( True );
     else:
         raise ValueError("tupleId is not valid. It is an empty one");
+    
+  
+    
+  # Zeroes out the contents of the tuple at the given tuple id.
+  def clearTuple(self, tupleId):
+      
+    slotIndex = tupleId.tupleIndex;
+    start     = self.header.offsetOfSlot(slotIndex);
+    for i in range(0, len(self.header.schemaSizes)):
+        self.getbuffer()[start[i] : (start[i] + self.header.schemaSizes[i])] = \
+        bytearray(b'\x00' * self.header.self.header.schemaSizes[i]);
+    self.header.setDirty( True );
+    
+  # Adds a packed tuple to the page. Returns the tuple id of the newly added tuple.
+  def insertTuple(self, tupleData):
+      
+    if self.header.hasFreeTuple():
+        slotIndex = self.header.nextFreeTuple();
+        start     = self.header.offsetOfSlot(slotIndex);
+        tupleSt   = 0;
+        
+        for i in range(0, len(self.header.schemaSizes)):
+            self.getbuffer()[start[i] : (start[i] + self.header.schemaSizes[i])] = \
+            tupleData[ tupleSt, tupleSt + self.header.schemaSizes[i] ];
+            tupleSt += self.header.schemaSizes[i];
+            
+        self.header.setDirty( True );
+        return TupleId(self.pageId, slotIndex);
+    else:
+        raise ValueError("This page is full!");
+    
+  # Removes the tuple at the given tuple id, shifting subsequent tuples.
+  def deleteTuple(self, tupleId):
+    return super(PaxPage, self).deleteTuple( tupleId );
+
+  def getTupleField(self, tupleId, fieldPosition):
+    raise NotImplementedError;
 
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained
