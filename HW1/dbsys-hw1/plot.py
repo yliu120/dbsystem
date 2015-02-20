@@ -1,3 +1,4 @@
+#!/usr/bin/python
 ########################################
 # This file takes input from stdin
 # And draws the pyplot
@@ -5,6 +6,8 @@
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
+
+pageTitle = sys.argv[1]
 
 sf = np.arange(0.0, 1.1, 0.1)
 data_time = []
@@ -20,7 +23,7 @@ plt.figure(1)
 # plt.subplot(211)
 plt.xlabel('Scale Factor')
 plt.ylabel('Time(seconds)')
-plt.title('Time Taken to Run Workload')
+plt.title('Time Taken to Run Workload' + pageTitle);
 
 lines = plt.plot(sf, data_time[0:11], 'r^-', 
          sf, data_time[11:22], 'b^-',
@@ -49,4 +52,4 @@ plt.ylabel('Size(kilobytes)')
 plt.title('Size of Storage Files After Running Workload')
 plt.plot(sf, np.cos(2*np.pi*t2), 'r--')
 """
-plt.savefig('timefig.png')
+plt.savefig('timefig-' + pageTitle + '.png');

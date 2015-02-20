@@ -371,6 +371,15 @@ class PaxPage(SlottedPage):
   # Check that the page's slots have tracked the deletion.
   >>> p.header.usedSpace() == (sizeBeforeRemove - p.header.tupleSize)
   True
+  
+  # Testing getTupleField() and iterator
+  >>> e2 = schema.instantiate(1,26)
+  >>> tId1 = p.insertTuple(schema.pack(e2))
+  >>> import struct
+  >>> struct.unpack('i', p.getTupleField(tId1, 1))[0]
+  26
+  >>> [age for age in p.column(1)]
+  [20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 26]
 
   """   
   headerClass = PaxPageHeader
@@ -399,6 +408,7 @@ class PaxPage(SlottedPage):
     schema = kwargs.get("schema", None)
     if schema:
       schemaSizes = [Struct(str).size for str in [Types.formatType(x) for x in schema.types]];
+      self.types  = [str for str in [Types.formatType(x) for x in schema.types]];
       return PaxPageHeader(buffer=self.getbuffer(), schemaSizes=schemaSizes);
     else:
       raise ValueError("No schema provided when constructing a slotted page.")
@@ -496,7 +506,34 @@ class PaxPage(SlottedPage):
   @classmethod
   def unpack(cls, pageId, buffer):
     return super(PaxPage, cls).unpack(pageId, buffer); 
-    
+
+  # This function is an iterator over column data.
+  def column(self, fieldPosition):
+    return self.ColumnDataIterator( self, fieldPosition );
+
+  # This function is a helper function for iterator
+  def tupleId(self, tupleIndex):
+    return TupleId(self.pageId, tupleIndex);
+
+  # inner class for Column Data iterator
+  class ColumnDataIterator:
+      
+    def __init__(self, paxPage, fieldPosition):
+      self.currentTupleIdx = 0;
+      self.paxPage    = paxPage;
+      self.fieldPos   = fieldPosition;
+
+    def __iter__(self):
+      return self
+
+    def __next__(self):
+      if self.currentTupleIdx < self.paxPage.header.numUsed:
+          tId = self.paxPage.tupleId( self.paxPage.header.slotUsed[ self.currentTupleIdx ]);
+          self.currentTupleIdx += 1;
+          return Struct( self.paxPage.types[ self.fieldPos ] ).unpack(self.paxPage.getTupleField(tId, self.fieldPos))[0];
+      else:
+          raise StopIteration
+       
     
 if __name__ == "__main__":
     import doctest

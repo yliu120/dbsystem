@@ -8,7 +8,7 @@ from Storage.SlottedPage import SlottedPageHeader, SlottedPage
 from Storage.PaxPage import PaxPage, PaxPageHeader
 from Catalog.Schema import *
 
-StorageFile.defaultPageClass = SlottedPage
+StorageFile.defaultPageClass = PaxPage
 
 wg = WorkloadGenerator()
 storage = StorageEngine()
@@ -17,8 +17,8 @@ wg.createRelations(storage)
 sorted(list(storage.relations()))
 
 wg.loadDataset(storage, 'test/datasets/tpch-tiny', 1.0)
-print(wg.schemas['nation'].size)
-print(wg.schemas['supplier'].size)
-print([wg.schemas['supplier'].unpack(t).S_SUPPKEY for t in storage.tuples('supplier')])
+wg.runWorkload('test/datasets/tpch-tiny', 1.0, 4096, 1) # doctest:+ELLIPSIS
+wg.runWorkload('test/datasets/tpch-tiny', 1.0, 4096, 2) # doctest:+ELLIPSIS
+wg.runWorkload('test/datasets/tpch-tiny', 1.0, 4096, 3) # doctest:+ELLIPSIS
 
 
