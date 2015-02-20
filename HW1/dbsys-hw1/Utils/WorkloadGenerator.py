@@ -18,6 +18,7 @@ class WorkloadGenerator:
   A workload generator for random read operations.
 
   >>> wg = WorkloadGenerator()
+  >>> from Storage.PaxPage import PaxPage
   >>> storage = StorageEngine()
 
   >>> wg.parseDate('1996-01-01')

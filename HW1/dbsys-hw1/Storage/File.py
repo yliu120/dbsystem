@@ -5,6 +5,7 @@ from Catalog.Identifiers import PageId, FileId, TupleId
 from Catalog.Schema      import DBSchema
 from Storage.Page        import PageHeader, Page
 from Storage.SlottedPage import SlottedPageHeader, SlottedPage
+from Storage.PaxPage     import PaxPageHeader, PaxPage  
 
 
 class FileHeader:

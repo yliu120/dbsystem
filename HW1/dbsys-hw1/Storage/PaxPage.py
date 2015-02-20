@@ -6,7 +6,7 @@ from struct import Struct
 from io     import BytesIO
 
 from Catalog.Identifiers import PageId, FileId, TupleId
-from Catalog.Schema import DBSchema
+from Catalog.Schema import Types, DBSchema
 from Storage.Page import PageHeader, Page
 from Storage.SlottedPage import SlottedPageHeader, SlottedPage
 
@@ -279,6 +279,8 @@ class PaxPageHeader(SlottedPageHeader):
 ######################################################
 # This is an implementation of PAX page
 # This page inherits from SlottedPage. 
+# Note that page is a low-level storage unit so that 
+# use contractual programming but not defensive.
 #
 class PaxPage(SlottedPage):
   """
@@ -293,7 +295,7 @@ class PaxPage(SlottedPage):
   # Test harness setup.
   >>> schema = DBSchema('employee', [('id', 'int'), ('age', 'int')])
   >>> pId    = PageId(FileId(1), 100)
-  >>> p      = SlottedPage(pageId=pId, buffer=bytes(4096), schema=schema)
+  >>> p      = PaxPage(pageId=pId, buffer=bytes(4096), schema=schema)
 
   # Validate header initialization
   >>> p.header.numTuples() == 0 and p.header.usedSpace() == 0
@@ -371,7 +373,7 @@ class PaxPage(SlottedPage):
   True
 
   """   
-  headerClass = SlottedPageHeader
+  headerClass = PaxPageHeader
   
   def __init__(self, **kwargs):
 
@@ -426,7 +428,6 @@ class PaxPage(SlottedPage):
     t         = b'';
     for i in range(0, len(self.header.schemaSizes)):
         t += self.getvalue()[start[i] : (start[i] + self.header.schemaSizes[i])]
-    
     return t;
 
   # Updates the (packed) tuple at the given tuple id.
@@ -438,13 +439,12 @@ class PaxPage(SlottedPage):
         tupleSt   = 0;
         for i in range(0, len(self.header.schemaSizes)):
             self.getbuffer()[start[i] : (start[i] + self.header.schemaSizes[i])] = \
-            tupleData[ tupleSt, tupleSt + self.header.schemaSizes[i] ];
+            tupleData[ tupleSt : (tupleSt + self.header.schemaSizes[i]) ];
             tupleSt += self.header.schemaSizes[i];
         self.header.setDirty( True );
     else:
         raise ValueError("tupleId is not valid. It is an empty one");
     
-  
     
   # Zeroes out the contents of the tuple at the given tuple id.
   def clearTuple(self, tupleId):
@@ -453,7 +453,7 @@ class PaxPage(SlottedPage):
     start     = self.header.offsetOfSlot(slotIndex);
     for i in range(0, len(self.header.schemaSizes)):
         self.getbuffer()[start[i] : (start[i] + self.header.schemaSizes[i])] = \
-        bytearray(b'\x00' * self.header.self.header.schemaSizes[i]);
+        bytearray(b'\x00' * self.header.schemaSizes[i]);
     self.header.setDirty( True );
     
   # Adds a packed tuple to the page. Returns the tuple id of the newly added tuple.
@@ -466,7 +466,7 @@ class PaxPage(SlottedPage):
         
         for i in range(0, len(self.header.schemaSizes)):
             self.getbuffer()[start[i] : (start[i] + self.header.schemaSizes[i])] = \
-            tupleData[ tupleSt, tupleSt + self.header.schemaSizes[i] ];
+            tupleData[ tupleSt : (tupleSt + self.header.schemaSizes[i]) ];
             tupleSt += self.header.schemaSizes[i];
             
         self.header.setDirty( True );
@@ -479,7 +479,11 @@ class PaxPage(SlottedPage):
     return super(PaxPage, self).deleteTuple( tupleId );
 
   def getTupleField(self, tupleId, fieldPosition):
-    raise NotImplementedError;
+    
+    slotIndex = tupleId.tupleIndex;
+    start     = self.header.offsetOfSlot(slotIndex)[ fieldPosition ];
+    t         = self.getvalue()[start : (start + self.header.schemaSizes[ fieldPosition ])];
+    return t;
 
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained

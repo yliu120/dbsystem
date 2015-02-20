@@ -177,7 +177,7 @@ class DBSchema:
       self.fields  = [x[0] for x in fieldsAndTypes]
       self.types   = [x[1] for x in fieldsAndTypes]
       self.clazz   = namedtuple(self.name, self.fields)
-      self.binrepr = Struct(''.join([Types.formatType(x) for x in self.types]))
+      self.binrepr = Struct('='+''.join([Types.formatType(x) for x in self.types]))
       self.size    = self.binrepr.size
     else:
       raise ValueError("Invalid attributes when constructing a schema")
