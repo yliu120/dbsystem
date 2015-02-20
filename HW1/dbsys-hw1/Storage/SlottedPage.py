@@ -450,9 +450,12 @@ class SlottedPage(Page):
   def putTuple(self, tupleId, tupleData):
       
     slotIndex = tupleId.tupleIndex;
-    start     = self.header.offsetOfSlot(slotIndex);
-    self.getbuffer()[start:(start + self.header.tupleSize)] = tupleData;
-    self.header.setDirty( True );
+    if slotIndex in self.header.slotUsed:
+        start     = self.header.offsetOfSlot(slotIndex);
+        self.getbuffer()[start:(start + self.header.tupleSize)] = tupleData;
+        self.header.setDirty( True );
+    else:
+        raise ValueError("tupleId is not valid. It is an empty one");
 
   # Adds a packed tuple to the page. Returns the tuple id of the newly added tuple.
   def insertTuple(self, tupleData):

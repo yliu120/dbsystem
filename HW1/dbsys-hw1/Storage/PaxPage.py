@@ -103,7 +103,7 @@ class PaxPageHeader(SlottedPageHeader):
         if buffer:
             
             self.schemaSizes   = kwargs.get("schemaSizes", []);
-            self.tupleSize          = functools.reduce(lambda x, y: x+y, self.schemaSizes);
+            self.tupleSize     = functools.reduce(lambda x, y: x+y, self.schemaSizes);
             self.pageCapacity  = len(buffer);
             self.numSlots      = math.floor( ( self.pageCapacity - 2 * ( 3 + len(self.schemaSizes) ) )  / float( self.tupleSize + 0.125 ) )  # every bit takes 1/8 byte.
       
@@ -423,7 +423,24 @@ class PaxPage(SlottedPage):
       
     slotIndex = tupleId.tupleIndex;
     start     = self.header.offsetOfSlot(slotIndex);
-    return self.getvalue()[start:(start + self.header.tupleSize)];
+    t         = b'';
+    for i in range(0, len(self.header.schemaSizes)):
+        t += self.getvalue()[start[i] : (start[i] + self.header.schemaSizes[i])]
+    
+    return t;
+
+  # Updates the (packed) tuple at the given tuple id.
+  def putTuple(self, tupleId, tupleData):
+      
+    slotIndex = tupleId.tupleIndex;
+    if slotIndex in self.header.slotUsed:
+        start     = self.header.offsetOfSlot(slotIndex);
+        for i in range(0, len(self.header.schemaSizes)):
+            self.getbuffer()[start[i] : (start[i] + self.header.schemaSizes[i])] = \
+            tupleData[ self.header.schemaSizes[i], self.header.schemaSizes[i+1] ];
+        self.header.setDirty( True );
+    else:
+        raise ValueError("tupleId is not valid. It is an empty one");
 
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained
