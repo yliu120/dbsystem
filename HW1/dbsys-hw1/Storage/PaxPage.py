@@ -20,6 +20,78 @@ class PaxPageHeader(SlottedPageHeader):
     (numSlots, nextSlot, numFields, [size for each field], slotbuffer)
     
     The followings are doctests:
+    
+    >>> import io
+    >>> buffer = io.BytesIO(bytes(4096))
+    >>> ph     = PaxPageHeader(buffer=buffer.getbuffer(), schemaSizes=[4,8,2,2])
+    >>> ph2    = PaxPageHeader.unpack(buffer.getbuffer())
+
+    ## Dirty bit tests
+    >>> ph.isDirty()
+    False
+    >>> ph.setDirty(True)
+    >>> ph.isDirty()
+    True
+    >>> ph.setDirty(False)
+    >>> ph.isDirty()
+    False
+
+    ## Tuple count tests
+    >>> ph.hasFreeTuple()
+    True
+
+    # First tuple allocated should be at the first slot.
+    # Notice this is a slot index, not an offset as with contiguous pages.
+    >>> ph.nextFreeTuple() == 0
+    True
+
+    >>> ph.numTuples()
+    1
+
+    >>> tuplesToTest = 10
+    >>> [ph.nextFreeTuple() for i in range(0, tuplesToTest)]
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+  
+    >>> ph.numTuples() == tuplesToTest+1
+    True
+
+    >>> ph.hasFreeTuple()
+    True
+
+    # Check space utilization
+    >>> ph.usedSpace() == (tuplesToTest+1)*ph.tupleSize
+    True
+
+    >>> ph.freeSpace() == 4096 - (ph.headerSize() + ((tuplesToTest+1) * ph.tupleSize))
+    True
+
+    >>> remainingTuples = int(ph.freeSpace() / ph.tupleSize)
+
+    # Fill the page.
+    >>> [ph.nextFreeTuple() for i in range(0, remainingTuples)] # doctest:+ELLIPSIS
+    [11, 12, ...]
+
+    >>> ph.hasFreeTuple()
+    False
+
+    # No value is returned when trying to exceed the page capacity.
+    >>> ph.nextFreeTuple() == None
+    True
+  
+    >>> ph.freeSpace() < ph.tupleSize
+    True
+    
+    # Testing offset calculations:
+    >>> ph.offsets[0] == ph.headerSize();
+    True
+    
+    >>> ph.offsets[1] == ph.headerSize() + ph.numSlots * 4;
+    True
+    
+    >>> ph.offsets[2] == ph.headerSize() + ph.numSlots * 12;
+    True
+    >>> ph.offsetOfSlot( 9 )[0] == ph.headerSize() + 9 * 4;
+    True
     '''
     
     def __init__(self, **kwargs):
@@ -31,7 +103,7 @@ class PaxPageHeader(SlottedPageHeader):
         if buffer:
             
             self.schemaSizes   = kwargs.get("schemaSizes", []);
-            tupleSize          = functools.reduce(lambda x, y: x+y, self.schemaSizes);
+            self.tupleSize          = functools.reduce(lambda x, y: x+y, self.schemaSizes);
             self.pageCapacity  = len(buffer);
             self.numSlots      = math.floor( ( self.pageCapacity - 2 * ( 3 + len(self.schemaSizes) ) )  / float( self.tupleSize + 0.125 ) )  # every bit takes 1/8 byte.
       
@@ -129,7 +201,7 @@ class PaxPageHeader(SlottedPageHeader):
     def pack(self):
     
         packedHeader = struct.pack("HHH", self.numSlots, self.nextSlot, len(self.schemaSizes));
-        packedHeader += struct.pack("sH" % len(self.schemaSizes), *(self.schemaSizes));
+        packedHeader += struct.pack('H' * len(self.schemaSizes), *(self.schemaSizes));
     
         # Next, we packed our slot buffer to bits
         bitSlot = 0
@@ -161,7 +233,7 @@ class PaxPageHeader(SlottedPageHeader):
         nextSlot  = values[1];
         numSize   = values[2];
         
-        schemaSizes = list( Struct("sH" % numSize).unpack_from(buffer, offset=6) );
+        schemaSizes = list( Struct('H' * numSize).unpack_from(buffer, offset=6) );
         
         ph        = cls(buffer=buffer, schemaSizes=schemaSizes, reconstruct=True);
         ph.numSlots = numSlots;
@@ -180,8 +252,8 @@ class PaxPageHeader(SlottedPageHeader):
                 count8 +=  1;
                 count  +=  1; 
         
-            if count >= ph.numSlots:
-                break;
+                if count >= ph.numSlots:
+                    break;
         
             continue;
     
@@ -206,3 +278,8 @@ class PaxPageHeader(SlottedPageHeader):
     
     
     
+    
+    
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()  
