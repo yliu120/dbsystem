@@ -276,8 +276,166 @@ class PaxPageHeader(SlottedPageHeader):
         return super(PaxPageHeader, self).hashSlotsHelper();
     
     
-    
-    
+######################################################
+# This is an implementation of PAX page
+# This page inherits from SlottedPage. 
+#
+class PaxPage(SlottedPage):
+  """
+  A PAX page implementation.
+
+  PAX pages use the PaxPageHeader class for its headers, which
+  maintains a set of slots to indicate valid tuples in the page.
+
+  >>> from Catalog.Identifiers import FileId, PageId, TupleId
+  >>> from Catalog.Schema      import DBSchema
+
+  # Test harness setup.
+  >>> schema = DBSchema('employee', [('id', 'int'), ('age', 'int')])
+  >>> pId    = PageId(FileId(1), 100)
+  >>> p      = SlottedPage(pageId=pId, buffer=bytes(4096), schema=schema)
+
+  # Validate header initialization
+  >>> p.header.numTuples() == 0 and p.header.usedSpace() == 0
+  True
+
+  # Create and insert a tuple
+  >>> e1 = schema.instantiate(1,25)
+  >>> tId = p.insertTuple(schema.pack(e1))
+
+  >>> tId.tupleIndex
+  0
+
+  # Retrieve the previous tuple
+  >>> e2 = schema.unpack(p.getTuple(tId))
+  >>> e2
+  employee(id=1, age=25)
+
+  # Update the tuple.
+  >>> e1 = schema.instantiate(1,28)
+  >>> p.putTuple(tId, schema.pack(e1))
+
+  # Retrieve the update
+  >>> e3 = schema.unpack(p.getTuple(tId))
+  >>> e3
+  employee(id=1, age=28)
+
+  # Compare tuples
+  >>> e1 == e3
+  True
+
+  >>> e2 == e3
+  False
+
+  # Check number of tuples in page
+  >>> p.header.numTuples() == 1
+  True
+
+  # Add some more tuples
+  >>> for tup in [schema.pack(schema.instantiate(i, 2*i+20)) for i in range(10)]:
+  ...    _ = p.insertTuple(tup)
+  ...
+
+  # Check number of tuples in page
+  >>> p.header.numTuples()
+  11
+
+  # Test iterator
+  >>> [schema.unpack(tup).age for tup in p]
+  [28, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38]
+
+  # Test clearing of first tuple
+  >>> tId = TupleId(p.pageId, 0)
+  >>> sizeBeforeClear = p.header.usedSpace()  
+  >>> p.clearTuple(tId)
+  
+  >>> schema.unpack(p.getTuple(tId))
+  employee(id=0, age=0)
+
+  >>> p.header.usedSpace() == sizeBeforeClear
+  True
+
+  # Check that clearTuple only affects a tuple's contents, not its presence.
+  >>> [schema.unpack(tup).age for tup in p]
+  [0, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38]
+
+  # Test removal of first tuple
+  >>> sizeBeforeRemove = p.header.usedSpace()
+  >>> p.deleteTuple(tId)
+
+  >>> [schema.unpack(tup).age for tup in p]
+  [20, 22, 24, 26, 28, 30, 32, 34, 36, 38]
+  
+  # Check that the page's slots have tracked the deletion.
+  >>> p.header.usedSpace() == (sizeBeforeRemove - p.header.tupleSize)
+  True
+
+  """   
+  headerClass = SlottedPageHeader
+  
+  def __init__(self, **kwargs):
+
+    buffer = kwargs.get("buffer", None)
+    if buffer:
+      BytesIO.__init__(self, buffer)
+      self.pageId = kwargs.get("pageId", None)
+      header      = kwargs.get("header", None)
+      schema      = kwargs.get("schema", None)
+
+      if self.pageId and header:
+        self.header = header
+      elif self.pageId:
+        self.header = self.initializeHeader(**kwargs)
+      else:
+        raise ValueError("No page identifier provided to page constructor.")
+
+    else:
+      raise ValueError("No backing buffer provided to page constructor.")
+  
+  # Header constructor override for directory pages.
+  def initializeHeader(self, **kwargs):
+    schema = kwargs.get("schema", None)
+    if schema:
+      schemaSizes = [Struct(str).size for str in [Types.formatType(x) for x in schema.types]];
+      return PaxPageHeader(buffer=self.getbuffer(), schemaSizes=schemaSizes);
+    else:
+      raise ValueError("No schema provided when constructing a slotted page.")
+  
+  # Tuple iterator.
+  def __iter__(self):
+      
+    self.iterTupleIdx = 0;
+    return self
+
+  def __next__(self):
+      
+    if self.iterTupleIdx < len(self.header.slotUsed):
+        t = self.getTuple(TupleId(self.pageId, self.header.slotUsed[self.iterTupleIdx]));
+        self.iterTupleIdx += 1;
+        return t;
+    else:
+      raise StopIteration
+  
+  # Tuple accessor methods
+
+  # Returns a byte string representing a packed tuple for the given tuple id.
+  def getTuple(self, tupleId):
+      
+    slotIndex = tupleId.tupleIndex;
+    start     = self.header.offsetOfSlot(slotIndex);
+    return self.getvalue()[start:(start + self.header.tupleSize)];
+
+  # Returns a binary representation of this page.
+  # This should refresh the binary representation of the page header contained
+  # within the page by packing the header in place.
+  def pack(self):
+    return super(PaxPage, self).pack();
+
+  # Creates a Page instance from the binary representation held in the buffer.
+  # The pageId of the newly constructed Page instance is given as an argument.
+  @classmethod
+  def unpack(cls, pageId, buffer):
+    return super(PaxPage, cls).unpack(pageId, buffer); 
     
     
 if __name__ == "__main__":
