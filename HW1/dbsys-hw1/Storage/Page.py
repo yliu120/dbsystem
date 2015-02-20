@@ -133,7 +133,7 @@ class PageHeader:
     self.flags           = kwargs.get("flags", b'\x00')
     self.tupleSize       = kwargs.get("tupleSize", None)
     self.pageCapacity    = kwargs.get("pageCapacity", len(buffer))
-    self.freeSpaceOffset = 0;
+    self.freeSpaceOffset = kwargs.get("freeSpaceOffset", 0);
     
     # write the head binary at the beginning
     buffer[0:self.headerSize()] = self.pack();
