@@ -431,12 +431,14 @@ class Page(BytesIO):
     else:
         start = self.header.headerSize() + tupleIndex * self.header.tupleSize;
         self.getbuffer()[start:(start + self.header.tupleSize)] = tupleData;
+        self.setDirty(True);
 
   # Adds a packed tuple to the page. Returns the tuple id of the newly added tuple.
   def insertTuple(self, tupleData):
     if self.header.hasFreeTuple():
         tupleIndex = self.header.nextFreeTuple();
         self.getbuffer()[tupleIndex:(tupleIndex+self.header.tupleSize)] = tupleData;
+        self.setDirty(True);
         return TupleId(self.pageId, self.header.numTuples() - 1);
     else:
         raise ValueError("This page is full!");
@@ -450,6 +452,7 @@ class Page(BytesIO):
     else:
         start = self.header.headerSize() + tupleIndex * self.header.tupleSize;
         self.getbuffer()[start:(start + self.header.tupleSize)] = bytearray(b'\x00' * self.header.tupleSize);
+        self.setDirty(True);
 
   # Removes the tuple at the given tuple id, shifting subsequent tuples.
   def deleteTuple(self, tupleId):
@@ -469,6 +472,7 @@ class Page(BytesIO):
                 self.getbuffer()[(startId - self.header.tupleSize):startId] = self.getvalue()[startId : (startId + self.header.tupleSize)]
         
         self.header.freeSpaceOffset = end;
+        self.setDirty(True);
         
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained

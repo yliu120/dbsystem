@@ -89,7 +89,6 @@ class SlottedPageHeader(PageHeader):
     if buffer:
       self.tupleSize     = kwargs.get("tupleSize", None);
       self.pageCapacity  = len(buffer);
-      #PageHeader.__init__(self, buffer=buffer);
       self.numSlots      = math.floor( ( self.pageCapacity - 2 * 3 )  / float( self.tupleSize + 0.125 ) )  # every bit takes 1/8 byte.
       
       # We keep an array of slots which should be updated. 
@@ -97,8 +96,10 @@ class SlottedPageHeader(PageHeader):
       
       # We implements a queue by list for availableSlots.
       self.availableSlots   = [];
+      self.slotUsed         = [];
       self.slotBufferLength = math.ceil( float(self.numSlots) / 8 );
       self.nextSlot         = 0;
+      self.numUsed          = 0;
       
       #initializing availableSlots
       for index in range(0, self.numSlots):
@@ -151,30 +152,26 @@ class SlottedPageHeader(PageHeader):
 
   # Returns the space used in the page associated with this header.
   def usedSpace(self):
-    return len(self.usedSlots()) * self.tupleSize;
+    return self.numUsed * self.tupleSize;
 
   # Slot operations.
   def offsetOfSlot(self, slotIndex):
     return self.headerSize() + slotIndex  * self.tupleSize;
 
   def resetSlot(self, slotIndex):
-    self.slots[ slotIndex ] = 0;
-
-  def usedSlots(self):
       
-    usedSlots = [];
-    index     = 0;
-    for slot in self.slots:
-        if slot != 0:
-            usedSlots.append(index);
-        index += 1;
-    return usedSlots;
+    self.slots[ slotIndex ] = 0;
+    
+    if slotIndex in self.slotUsed:
+        self.availableSlots.append( slotIndex );
+        self.slotUsed.remove( slotIndex );
+        self.numUsed -= 1;
     
   # Tuple allocation operations.
   
   # Returns whether the page has any free space for a tuple.
   def hasFreeTuple(self):
-    return (len(self.availableSlots) > 0);
+    return (self.numUsed < self.numSlots);
 
   # Returns the tupleIndex of the next free tuple.
   # This should also "allocate" the tuple, such that any subsequent call
@@ -187,10 +184,13 @@ class SlottedPageHeader(PageHeader):
         
         if len(self.availableSlots) > 1:
             self.nextSlot = self.availableSlots[1];
-            return self.availableSlots.pop(0);
         else:
             self.nextSlot = self.numSlots;
-            return self.availableSlots.pop(0);
+        
+        ready = self.availableSlots.pop(0);
+        self.slotUsed.append(ready);
+        self.numUsed += 1;
+        return ready;
 
   def nextTupleRange(self):
     
@@ -261,7 +261,10 @@ class SlottedPageHeader(PageHeader):
     for i in range(0, ph.numSlots):
         if ph.slots[i] == 0:
             ph.availableSlots.append(i);
-            
+        if ph.slots[i] == 1:
+            ph.slotUsed.append(i);
+    
+    ph.numUsed = len(ph.slotUsed);  
     return ph;
 
   # We implement a function that can return whether index mod 8 = 0?
@@ -278,7 +281,6 @@ class SlottedPageHeader(PageHeader):
     for i in range(0, self.numSlots):
         slots += self.slots[i];
     return slots;
-
 
 
 ######################################################
@@ -423,14 +425,13 @@ class SlottedPage(Page):
   # Tuple iterator.
   def __iter__(self):
       
-    self.usedSlots    = self.header.usedSlots();
     self.iterTupleIdx = 0;
     return self
 
   def __next__(self):
       
-    if self.iterTupleIdx < len(self.usedSlots):
-        t = self.getTuple(TupleId(self.pageId, self.usedSlots[self.iterTupleIdx]));
+    if self.iterTupleIdx < len(self.header.slotUsed):
+        t = self.getTuple(TupleId(self.pageId, self.header.slotUsed[self.iterTupleIdx]));
         self.iterTupleIdx += 1;
         return t;
     else:
@@ -480,8 +481,10 @@ class SlottedPage(Page):
     slotIndex = tupleId.tupleIndex;
     self.clearTuple(tupleId);
     self.header.availableSlots.append( slotIndex );
+    self.header.slotUsed.remove( slotIndex );
     self.header.slots[ slotIndex ] = 0;
     self.header.setDirty( True );
+    self.header.numUsed -= 1;
 
   # Returns a binary representation of this page.
   # This should refresh the binary representation of the page header contained

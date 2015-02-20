@@ -238,7 +238,7 @@ class StorageFile:
   """
 
   # Change this to the Page class if you want contiguous page storage in the file.
-  defaultPageClass = Page
+  defaultPageClass = SlottedPage
 
   # StorageFile constructor.
   #
@@ -351,8 +351,6 @@ class StorageFile:
 
   # Reads a page header from disk.
   def readPageHeader(self, pageId):
-      
-    self.checkPageClass(page)
     
     # Set the file handle to the correct page 
     if self.validPageId( pageId ): 
@@ -369,6 +367,7 @@ class StorageFile:
 
     self.file.seek( self.pageOffset( page.pageId ) );
     self.file.write( page.header.pack() );
+    self.flush();
     
   # Page operations
   # page : the page buffer
@@ -388,6 +387,7 @@ class StorageFile:
     pId = page.pageId;
     self.file.seek( self.pageOffset(pId) );
     self.file.write( page.pack() );
+    self.flush();
     
     if not self.validPageId( pId ):
         self.pageNum += 1;
