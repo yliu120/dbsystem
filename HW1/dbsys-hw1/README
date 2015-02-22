@@ -1,0 +1,24 @@
+AUTHOR:
+
+Qing    Liu, qingliu@jhu.edu
+Yunlong Liu, yliu120@jhmi.edu
+
+How to run our program?
+
+For SlottedPage Workload Test:
+./runSlottedPage
+
+For PaxPage:
+./runPaxPage
+
+
+Attention:
+1) Please use the API framework that we submitted. Since in
+this version, we handled some typos in the original API.
+
+Like: in the Storage/FileManager.py
+
+Bug 1: removeRelation() -> rFile.path should be rFile.filePath
+Bug 2: writePage( page ) -> there is no global pageId that can 
+       be locally called.
+...

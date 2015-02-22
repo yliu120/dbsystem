@@ -13,7 +13,7 @@ if sys.argv[1] == "s":
 if sys.argv[1] == "p":
 	StorageFile.defaultPageClass = PaxPage;
 
-datadir = 'test/datasets/tpch-tiny'
+datadir = '/home/cs416/datasets/tpch-sf1'
 scaleFactor = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 pageSize = [4096, 32768]
 workloadMode = [1, 2, 3, 4]

@@ -91,7 +91,7 @@ class BufferPool:
     
     else:
        # Cache miss
-       if self.freeList is []:
+       if not self.freeList:
           self.evictPage();
           # Here we are not thinking of concurrency problem.
           # Then by the algorithm, now we should have 1 element in the freeList
@@ -101,8 +101,8 @@ class BufferPool:
           # add page to our datastructure
           self.frames  [ self.freeList[0] ] = page;
           self.backward[ pageId ]           = self.freeList[0];
-          self.replaceQ.update({pageId : self.freelist[0]});
-          self.freelist.pop(0);
+          self.replaceQ.update({pageId : self.freeList[0]});
+          self.freeList.pop(0);
        else:
           offset = self.freeList.pop(0);
           buffer = self.pool.getbuffer()[ offset : (offset + self.pageSize) ];
@@ -125,7 +125,8 @@ class BufferPool:
     self.replaceQ.pop(pageId);
 
   def flushPage(self, pageId):
-    self.fileMgr.writePage(pageId);
+    offset = self.backward[ pageId ];
+    self.fileMgr.writePage( self.frames[ offset ] );
 
   # Evict using LRU policy. 
   # We implement LRU through the use of an OrderedDict, and by moving pages
