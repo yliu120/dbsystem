@@ -75,6 +75,7 @@ class GroupBy(Operator):
   # Page-at-a-time operator processing
   def processInputPage(self, pageId, page):
     
+    # Add local schemas
     inputSchema  = self.subPlan.schema()
     outputSchema = self.schema()
 
