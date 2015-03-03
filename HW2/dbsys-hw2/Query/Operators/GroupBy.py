@@ -74,11 +74,42 @@ class GroupBy(Operator):
 
   # Page-at-a-time operator processing
   def processInputPage(self, pageId, page):
-    raise ValueError("Page-at-a-time processing not supported for group-by")
+    
+    inputSchema  = self.subPlan.schema()
+    outputSchema = self.schema()
+
+    if set(locals().keys()).isdisjoint(set(inputSchema.fields)):
+      for inputTuple in page:
+        # Execute the projection expressions.
+        projectExprEnv = self.loadSchema(inputSchema, inputTuple)
+        vals = {k : eval(v[0], globals(), projectExprEnv) for (k,v) in self.projectExprs.items()}
+        outputTuple = outputSchema.pack([vals[i] for i in outputSchema.fields])
+        self.emitOutputTuple(outputTuple)
+    
+    else:
+      raise ValueError("Overlapping variables detected with operator schema")
 
   # Set-at-a-time operator processing
   def processAllPages(self):
-    raise NotImplementedError
+    if self.inputIterator is None:
+      self.inputIterator = iter(self.subPlan)
+
+    # Process all pages from the child operator.
+    try:
+      for (pageId, page) in self.inputIterator:
+        self.processInputPage(pageId, page)
+
+        # No need to track anything but the last output page when in batch mode.
+        if self.outputPages:
+          self.outputPages = [self.outputPages[-1]]
+
+    # To support pipelined operation, processInputPage may raise a
+    # StopIteration exception during its work. We catch this and ignore in batch mode.
+    except StopIteration:
+      pass
+
+    # Return an iterator to the output relation
+    return self.storage.pages(self.relationId())
 
 
   # Plan and statistics information
