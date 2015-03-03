@@ -57,13 +57,20 @@ class GroupBy(Operator):
   def inputs(self):
     return [self.subPlan]
 
-  # Iterator abstraction for selection operator.
+  # Iterator abstraction for group-by operator.
+  # Note that the Group-By operator does NOT support pipeline mode
   def __iter__(self):
-    raise NotImplementedError
+      
+    self.initializeOutput();
+    self.inputIterator = iter(self.subPlan);
+    self.inputFinished = False;
+    
+    self.outputIterator = self.processAllPages();
+    
+    return self
 
-  def __next__(self):
-    raise NotImplementedError
-
+  def __next__(self):  
+    return next(self.outputIterator);
 
   # Page-at-a-time operator processing
   def processInputPage(self, pageId, page):
