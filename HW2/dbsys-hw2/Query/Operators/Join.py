@@ -175,6 +175,7 @@ class Join(Operator):
         
         self.storage.bufferpool.unpinPage(lPageId);
         self.storage.bufferpool.discardPage(lPageId);
+        
     
 
   # Accesses a block of pages from an iterator.
