@@ -181,6 +181,8 @@ class Join(Operator):
   # This method pins pages in the buffer pool during its access.
   # We track the page ids in the block to unpin them after processing the block.
   def accessPageBlock(self, bufPool, pageIterator):
+    
+    self.cleanBufferPool( bufPool );
     pageBlock = [];
     self.inputFinished = False;
     while not(self.inputFinished):
@@ -206,7 +208,24 @@ class Join(Operator):
   def indexedNestedLoops(self):
     raise NotImplementedError
 
+  ##################################
+  #
+  # Some helper function
+  #
+  # clean buffer pool before use
+  def cleanBufferPool(self, bufPool):
 
+    # evict out clean pages and flush dirty pages
+    for (pageId, (_, page, pinCount)) in bufPool.pageMap.items():
+      if not(pinCount == 0):
+        raise RuntimeError("Unable to clean bufferpool. Memory leaks?");
+      else:
+        if (pageId.isDirty()):
+          # evict with flush
+          bufPool.flushPage( pageId );
+        # evict without flush
+        bufPool.discardPage( pageId );
+  
   ##################################
   #
   # Hash join implementation.
