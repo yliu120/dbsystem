@@ -95,10 +95,18 @@ class Join(Operator):
 
   # Iterator abstraction for join operator.
   def __iter__(self):
-    return NotImplementedError
+    self.initializeOutput();
+    if self.pipelined:
+      raise ValueError("Page-at-a-time processing not supported for joins");
+  
+    self.outputIterator = self.processAllPages();
+
+    return self;
 
   def __next__(self):
-    return NotImplementedError
+    if self.pipelined:
+      raise ValueError("Page-at-a-time processing not supported for joins");
+    return next(self.outputIterator);
 
   # Page-at-a-time operator processing
   def processInputPage(self, pageId, page):
@@ -159,24 +167,27 @@ class Join(Operator):
   # for its block of the outer relation.
 
   def blockNestedLoops(self):
-    for pageBlock in accessPageBlock(self.storage.bufferpool, iter(self.lhsPlan)):
+    for pageBlock in self.accessPageBlock(self.storage.bufferPool, iter(self.lhsPlan)):
       for lPageId in pageBlock:
-        lhsPage = self.storage.bufferpool.getPage(lPageId);
+        lhsPage = self.storage.bufferPool.getPage(lPageId);
         for lTuple in lhsPage:
           joinExprEnv = self.loadSchema(self.lhsSchema, lTuple);
                   
           for (rPageId, rhsPage) in iter(self.rhsPlan):
             for rTuple in rhsPage:
-              joinExprEnv.update(self.loadSchema(self.rhsSchema, rTuple))
+              joinExprEnv.update(self.loadSchema(self.rhsSchema, rTuple));
                     
               if eval(self.joinExpr, globals(), joinExprEnv):
                 outputTuple = self.joinSchema.instantiate(*[joinExprEnv[f] for f in self.joinSchema.fields]);
-                self.emitOutputTuple(self.joinSchema.pack(outputTuple));     
+                self.emitOutputTuple(self.joinSchema.pack(outputTuple));
+          
+          if self.outputPages:
+            self.outputPages = [self.outputPages[-1]];
         
-        self.storage.bufferpool.unpinPage(lPageId);
-        self.storage.bufferpool.discardPage(lPageId);
+        self.storage.bufferPool.unpinPage(lPageId);
+        self.storage.bufferPool.discardPage(lPageId);
         
-    
+    return self.storage.pages(self.relationId())
 
   # Accesses a block of pages from an iterator.
   # This method pins pages in the buffer pool during its access.
@@ -221,7 +232,7 @@ class Join(Operator):
       if not(pinCount == 0):
         raise RuntimeError("Unable to clean bufferpool. Memory leaks?");
       else:
-        if (pageId.isDirty()):
+        if (page.isDirty()):
           # evict with flush
           bufPool.flushPage( pageId );
         # evict without flush
