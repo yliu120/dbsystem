@@ -1,7 +1,7 @@
 from Catalog.Schema import DBSchema
 from Query.Operator import Operator
 
-import gc, resource;
+import gc, sys;
 import collections
 from _functools import reduce
 
@@ -17,6 +17,7 @@ class GroupBy(Operator):
           groupHashFn=(lambda gbVal: hash(gbVal[0]) % 2) \
           ).finalize()
   '''
+  memoryLimit = 1 << 20; # 1GB   
     
   def __init__(self, subPlan, **kwargs):
     super().__init__(**kwargs)
@@ -114,7 +115,7 @@ class GroupBy(Operator):
               self.grouping[groupKey] = [ self.aggExprs[i][1](tmpStore[i], inputTupleData) for i in range(0, len(self.aggExprs)) ]; 
                 
             else:
-              if not(len(self.grouping) > self.memoryLimit()):
+              if not(sys.getsizeof(self.grouping) > self.memoryLimit):
                 self.grouping[groupKey] = [ agg(init, inputTupleData) for (init, agg, _) in self.aggExprs ]; 
               else:
                 self.putInPartition( groupKey, inputTuple ); 
@@ -240,9 +241,6 @@ class GroupBy(Operator):
       self.emitOutputTuple(outputTuple);
     
     del group;
-    
-  def memoryLimit(self):
-    return 1000;
 
   def putInPartition(self, groupKey, tupleData):
 
