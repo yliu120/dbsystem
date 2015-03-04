@@ -158,11 +158,45 @@ class Join(Operator):
   # This attempts to use all the free pages in the buffer pool
   # for its block of the outer relation.
 
+  def blockNestedLoops(self):
+    for pageBlock in accessPageBlock(self.storage.bufferpool, iter(self.lhsPlan)):
+      for lPageId in pageBlock:
+        lhsPage = self.storage.bufferpool.getPage(lPageId);
+        for lTuple in lhsPage:
+          joinExprEnv = self.loadSchema(self.lhsSchema, lTuple);
+                  
+          for (rPageId, rhsPage) in iter(self.rhsPlan):
+            for rTuple in rhsPage:
+              joinExprEnv.update(self.loadSchema(self.rhsSchema, rTuple))
+                    
+              if eval(self.joinExpr, globals(), joinExprEnv):
+                outputTuple = self.joinSchema.instantiate(*[joinExprEnv[f] for f in self.joinSchema.fields]);
+                self.emitOutputTuple(self.joinSchema.pack(outputTuple));     
+        
+        self.storage.bufferpool.unpinPage(lPageId);
+        self.storage.bufferpool.discardPage(lPageId);
+    
+
   # Accesses a block of pages from an iterator.
   # This method pins pages in the buffer pool during its access.
   # We track the page ids in the block to unpin them after processing the block.
   def accessPageBlock(self, bufPool, pageIterator):
-    raise NotImplementedError
+    pageBlock = [];
+    self.inputFinished = False;
+    while not(self.inputFinished):
+      try:
+        (pageId, page) = next(pageIterator);
+        if (bufPool.numFreePages() > 2):
+          _ = bufPool.getPage(pageId);
+          bufPool.pinPage(pageId);
+          pageBlock.append(pageId);
+        else:
+          yield pageBlock;
+          pageBlock = [];
+      except StopIteration:
+        self.inputFinished = True;
+        yield pageBlock;
+      
 
 
   ##################################
