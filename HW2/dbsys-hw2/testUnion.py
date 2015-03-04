@@ -7,7 +7,6 @@ from Catalog.Schema  import DBSchema
 from Query.Operators.TableScan import TableScan
 from Query.Operators.Select    import Select
 from Query.Operators.Project   import Project
-from Query.Operators.GroupBy   import GroupBy
 from Query.Operators.Union   import Union
 
 
