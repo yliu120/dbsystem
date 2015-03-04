@@ -8,12 +8,6 @@ from _functools import reduce
 class GroupBy(Operator):
     
   '''
-     Note that our groupHashFn is used to judge whether we want to fit our 
-     grouping hash table in the main memory. That is, if the groupHashFn is
-     given(not None), we will definitely use it to create tmp partition file.
-     However, if it is not provided, we will build the hash-table in our 
-     main memory.
-     
           query6 = db.query().fromTable('employee').groupBy( \
           groupSchema=keySchema, \
           aggSchema=aggMinMaxSchema, \
@@ -40,7 +34,7 @@ class GroupBy(Operator):
 
     self.validateGroupBy()
     self.initializeSchema()
-    self.cantFit     = False;
+    self.tmpFiles    = dict();
 
   # Perform some basic checking on the group-by operator's parameters.
   def validateGroupBy(self):
@@ -107,10 +101,11 @@ class GroupBy(Operator):
     # aggSchema  : self.aggSchema;
     outputSchema = self.schema()
     
-    if not(self.cantFit):
+    if self.running:
         if set(locals().keys()).isdisjoint(set(inputSchema.fields)):
         
           for inputTuple in page:
+              
             # Execute the projection expressions.
             inputTupleData = inputSchema.unpack( inputTuple );
             groupKey       = self.groupExpr( inputTupleData );
@@ -119,13 +114,16 @@ class GroupBy(Operator):
               self.grouping[groupKey] = [ self.aggExprs[i][1](tmpStore[i], inputTupleData) for i in range(0, len(self.aggExprs)) ]; 
                 
             else:
-              self.grouping[groupKey] = [ agg(init, inputTupleData) for (init, agg, _) in self.aggExprs ]; 
-    
+              if not(len(self.grouping) > self.memoryLimit()):
+                self.grouping[groupKey] = [ agg(init, inputTupleData) for (init, agg, _) in self.aggExprs ]; 
+              else:
+                self.putInPartition( groupKey, inputTuple ); 
+
         else:
             raise ValueError("Overlapping variables detected with operator schema")
 
     else:
-        # We partition relation into temp partition files
+        # We currently don't support not aggregatable value.
         raise NotImplementedError;
     
   # Set-at-a-time operator processing
@@ -145,10 +143,29 @@ class GroupBy(Operator):
         # No need to track anything but the last output page when in batch mode.
         if self.outputPages:
           self.outputPages = [self.outputPages[-1]]
+      
+      # release memory of self.grouping before handling the tmp file data   
+      self.outputGrouping( self.grouping );
+      self.grouping.clear();
+      gc.collect();
+      
+      if len(self.tmpFiles) > 0:
+        for (k, v) in self.tmpFiles.items():
+          pageIterator = v.pages();
+          for (pageId, page) in pageIterator:
+            self.processInputPage(pageId, page)
+            
+            # No need to track anything but the last output page when in batch mode.
+            if self.outputPages:
+              self.outputPages = [self.outputPages[-1]]
+              
+            self.outputGrouping( self.grouping );
+            self.grouping.clear();
+            gc.collect();
+          # clean up all the tmp File
+          self.storage.removeRelation(k);
           
-        if not(self.cantFit):
-          self.outputGrouping( self.grouping );
-
+    
     # To support pipelined operation, processInputPage may raise a
     # StopIteration exception during its work. We catch this and ignore in batch mode.
     except StopIteration:
@@ -184,7 +201,7 @@ class GroupBy(Operator):
             result = False;
           else:
             result = True;
-            
+      return result;
     else:
       raise RuntimeError("No aggExprs define for this operator");
   
@@ -206,13 +223,39 @@ class GroupBy(Operator):
   def outputGrouping(self, group):
       
     outputSchema = self.outputSchema;
+    sizeOfAgg    = len(self.aggSchema.fields);
+    
     for (k,v) in group.items():
       output = [];
       if isinstance(k, tuple):
         output = [ele for ele in k];
       else:
         output = [ k ];
+    
+      # processing v with final expr:
+      tmpSt = v;
+      v = [ self.aggExprs[i][2](tmpSt[i]) for i in range(0, sizeOfAgg)]
       output.extend(v);
       outputTuple = outputSchema.pack( output );
       self.emitOutputTuple(outputTuple);
+    
+    del group;
+    
+  def memoryLimit(self):
+    return 1000;
+
+  def putInPartition(self, groupKey, tupleData):
+
+    relIdTmp = self.relationId() + str( self.groupHashFn( groupKey ) ) + "GroupByTmp";
+    
+    if not(self.storage.hasRelation(relIdTmp)):
+      self.storage.createRelation(relIdTmp, self.subPlan.schema());
+      tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+      self.tmpFiles[ relIdTmp ] = tempFile;
+      tempFile.insertTuple( tupleData );
+      
+    else:
+      self.tmpFiles[ relIdTmp ].insertTuple( tupleData );
+    
+      
       
