@@ -37,10 +37,10 @@ class Union(Operator):
   # non-pipelined cases
   def __iter__(self):
     self.initializeOutput();
-    self.inputIterator = itertools.chain(self.lhsPlan, self.rhsPlan);
-    self.lhsPlanLen = len(list(iter(self.lhsPlan)));
-    self.itercounter = 0;
-    self.inputFinished = False;
+    self.inputIteratorL = iter(self.lhsPlan);
+    self.inputIteratorR = iter(self.rhsPlan);
+    self.inputFinishedL = False;
+    self.inputFinishedR = False;
 
     if not self.pipelined:
       self.outputIterator = self.processAllPages();
@@ -50,12 +50,18 @@ class Union(Operator):
   # Method used for iteration, doing work in the process. Handle pipelined and non-pipelined cases
   def __next__(self):
     if self.pipelined:
-      while not(self.inputFinished or self.isOutputPageReady()):
+      while not(self.inputFinishedL or self.isOutputPageReady()):
         try:
-          pageId, page = next(self.inputIterator);
-          self.processInputPage(pageId, page);
+          pageId, page = next(self.inputIteratorL);
+          self.processInputPageL(pageId, page);
         except StopIteration:
-          self.inputFinished = True;
+          self.inputFinishedL = True;
+      while (self.inputFinishedL and (not(self.inputFinishedR or self.isOutputPageReady()))):
+        try:
+          pageId, page = next(self.inputIteratorR);
+          self.processInputPageR(pageId, page);
+        except StopIteration:
+          self.inputFinishedR = True;
           
       return self.outputPage();
     
@@ -67,32 +73,38 @@ class Union(Operator):
 
   # Page-at-a-time operator processing
   # For union all, this copies over the input tuple to the output
-  def processInputPage(self, pageId, page):
-    inputSchemaL = self.inputSchemas()[0];
+  def processInputPageL(self, pageId, page):
+    for inputTuple in page:
+      outputTuple = inputTuple;
+      self.emitOutputTuple(outputTuple);
+    
+  def processInputPageR(self, pageId, page):
     inputSchemaR = self.inputSchemas()[1];
     outputSchema = self.schema();
-    
-    if (self.itercounter < self.lhsPlanLen):
-      for inputTuple in page:
-        outputTuple = inputTuple;
-        self.emitOutputTuple(outputTuple);
-    else:
-      for inputTuple in page:
-        inputR = self.loadSchema(inputSchemaR, inputTuple);
-        outputTuple = outputSchema.pack([inputR[i] for i in outputSchema.fields])
-        self.emitOutputTuple(outputTuple);
-    
-    self.itercounter += 1;
+  
+    for inputTuple in page:
+      inputR = self.loadSchema(inputSchemaR, inputTuple);
+      outputTuple = outputSchema.pack([inputR[i] for i in outputSchema.fields])
+      self.emitOutputTuple(outputTuple);
     
   # Set-at-a-time operator processing
   def processAllPages(self):
-    if self.inputIterator is None:
-      self.inputIterator = itertools.chain(self.lhsPlan, self.rhsPlan);
+    if self.inputIteratorL is None:
+      self.inputIteratorL = iter(self.lhsPlan);
+    if self.inputIteratorR is None:
+      self.inputIteratorR = iter(self.rhsPlan);
 
     # Process all pages from the child operator.
     try:
-      for (pageId, page) in self.inputIterator:
-        self.processInputPage(pageId, page);
+      for (pageId, page) in self.inputIteratorL:
+        self.processInputPageL(pageId, page);
+
+        # No need to track anything but the last output page when in batch mode.
+        if self.outputPages:
+          self.outputPages = [self.outputPages[-1]];
+          
+      for (pageId, page) in self.inputIteratorR:
+        self.processInputPageR(pageId, page);
 
         # No need to track anything but the last output page when in batch mode.
         if self.outputPages:
