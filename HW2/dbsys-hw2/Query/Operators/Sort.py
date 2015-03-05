@@ -31,11 +31,20 @@ class Sort(Operator):
 
 
   # Iterator abstraction for external sort operator.
+  # Apparently, external sort must not support page-at-a-time
+  # We apply a similar iterator implementation here as GroupBy
   def __iter__(self):
-    raise NotImplementedError
+      
+    self.initializeOutput();
+    self.inputIterator = iter(self.subPlan);
+    self.inputFinished = False;
+    
+    self.outputIterator = self.processAllPages();
+    
+    return self
 
-  def __next__(self):
-    raise NotImplementedError
+  def __next__(self):  
+    return next(self.outputIterator);
 
 
   # Page processing and control methods
