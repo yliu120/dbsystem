@@ -70,3 +70,16 @@ class Sort(Operator):
   def selectivity(self):
     return 1.0
 
+  # This function is a helper function on pass 0. 
+  # This is not an in-place version...
+  def pageSort(self, page):
+    
+    pageIterator = iter(page);
+    pageId       = page.pageId;
+    schema       = self.subPlan.schema();
+    tmpList      = sorted(pageIterator, key = lambda e : self.sortKeyFn(schema.unpack(e)) );
+    
+    id = 0;
+    for tupleData in tmpList:
+      page.putTuple( TupleId(pageId, id), tupleData );
+      id += 1;
