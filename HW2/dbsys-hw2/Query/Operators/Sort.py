@@ -55,7 +55,12 @@ class Sort(Operator):
 
   # Set-at-a-time operator processing
   def processAllPages(self):
-    raise NotImplementedError
+    
+    # local variable
+    schema  = self.schema();
+    
+    # pass 0
+    
 
 
   # Plan and statistics information
@@ -83,3 +88,19 @@ class Sort(Operator):
     for tupleData in tmpList:
       page.putTuple( TupleId(pageId, id), tupleData );
       id += 1;
+      
+  # Another helper function that borrowed from Join.py
+  # We need to clean buffer pool before using
+  # clean buffer pool before use
+  def cleanBufferPool(self, bufPool):
+
+    # evict out clean pages and flush dirty pages
+    for (pageId, (_, page, pinCount)) in bufPool.pageMap.items():
+      if not(pinCount == 0):
+        raise RuntimeError("Unable to clean bufferpool. Memory leaks?");
+      else:
+        if (page.isDirty()):
+          # evict with flush
+          bufPool.flushPage( pageId );
+        # evict without flush
+        bufPool.discardPage( pageId );
