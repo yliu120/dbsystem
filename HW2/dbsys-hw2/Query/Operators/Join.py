@@ -96,6 +96,8 @@ class Join(Operator):
   # Iterator abstraction for join operator.
   def __iter__(self):
     self.initializeOutput();
+    self.inputIteratorL = iter(self.lhsPlan);
+    self.inputIteratorR = iter(self.rhsPlan);
     self.outputIterator = self.processAllPages();
 
     return self;
@@ -162,13 +164,13 @@ class Join(Operator):
   # for its block of the outer relation.
 
   def blockNestedLoops(self):
-    for pageBlock in self.accessPageBlock(self.storage.bufferPool, iter(self.lhsPlan)):
+    for pageBlock in self.accessPageBlock(self.storage.bufferPool, self.inputIteratorL):
       for lPageId in pageBlock:
         lhsPage = self.storage.bufferPool.getPage(lPageId);
         for lTuple in lhsPage:
           joinExprEnv = self.loadSchema(self.lhsSchema, lTuple);
                   
-          for (rPageId, rhsPage) in iter(self.rhsPlan):
+          for (rPageId, rhsPage) in self.inputIteratorR:
             for rTuple in rhsPage:
               joinExprEnv.update(self.loadSchema(self.rhsSchema, rTuple));
                     
@@ -182,7 +184,7 @@ class Join(Operator):
         self.storage.bufferPool.unpinPage(lPageId);
         self.storage.bufferPool.discardPage(lPageId);
         
-    return self.storage.pages(self.relationId())
+    return self.storage.pages(self.relationId());
 
   # Accesses a block of pages from an iterator.
   # This method pins pages in the buffer pool during its access.
@@ -239,49 +241,64 @@ class Join(Operator):
   #
   def hashJoin(self):
     if self.joinExpr == None:
-      self.joinExpr = string(self.lhsKeySchema.fields) + "==" + string(self.rhsKeySchema.fields);
+      self.joinExpr = self.lhsKeySchema.fields[0] + "==" + self.rhsKeySchema.fields[0];
       # what if KeySchema includes multiple fields?
       # what if joinExpr is a range comparison?
     
-    self.tmpFilesL = dict();
-    self.tmpFilesR = dict();
+    self.tmpFilesL = list();
+    self.tmpFilesR = list();
     
-    for PageId, Page in iter(self.lhsPlan):
-      self.buildHashL(PageId, Page);
-    for PageId, Page in iter(self.rhsPlan):
-      self.buildHashR(PageId, Page);
+    for (PageId, Page) in self.inputIteratorL:
+      self.buildPartitionL(PageId, Page);
+    for (PageId, Page) in self.inputIteratorR:
+      self.buildPartitionR(PageId, Page);
+      
+    for relIdTmpL in self.tmpFilesL:
+      relIdTmpR = relIdTmpL.rstrip('L') + 'R';
+      if (self.storage.hasRelation(relIdTmpR)):
+        self.inputIteratorL = self.storage.pages(relIdTmpL);
+        self.inputIteratorR = self.storage.pages(relIdTmpR);
+        _ = self.blockNestedLoops();
+        
+        self.storage.removeRelation(relIdTmpL);
+        self.storage.removeRelation(relIdTmpR);
+    
+    return self.storage.pages(self.relationId());
+        
 
-  def buildHashL(self, PageId, Page):
+  def buildPartitionL(self, PageId, Page):
     inputSchema  = self.lhsSchema;
-    for inputTuple in page:
+    for inputTuple in Page:
       inputL = self.loadSchema(inputSchema, inputTuple);
       
-      relIdTmp = self.relationId() + eval(self.lhsHashFn, globals(), inputL) + "HashJoinTmp";
+      relIdTmp = self.relationId() + str(eval(self.lhsHashFn, globals(), inputL)) + "HashJoinTmpL";
     
       if not(self.storage.hasRelation(relIdTmp)):
         self.storage.createRelation(relIdTmp, inputSchema);
         tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
-        self.tmpFilesL[ relIdTmp ] = tempFile;
         tempFile.insertTuple( inputTuple );
+        self.tmpFilesL.append(relIdTmp);
       
       else:
-        self.tmpFilesL[ relIdTmp ].insertTuple( inputTuple );
+        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+        tempFile.insertTuple( inputTuple );
 
-  def buildHashR(self, PageId, Page):
+  def buildPartitionR(self, PageId, Page):
     inputSchema  = self.rhsSchema;
-    for inputTuple in page:
+    for inputTuple in Page:
       inputR = self.loadSchema(inputSchema, inputTuple);
       
-      relIdTmp = self.relationId() + eval(self.rhsHashFn, globals(), inputR) + "HashJoinTmp";
+      relIdTmp = self.relationId() + str(eval(self.rhsHashFn, globals(), inputR)) + "HashJoinTmpR";
       
       if not(self.storage.hasRelation(relIdTmp)):
         self.storage.createRelation(relIdTmp, inputSchema);
         tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
-        self.tmpFilesR[ relIdTmp ] = tempFile;
         tempFile.insertTuple( inputTuple );
+        self.tmpFilesR.append(relIdTmp);
       
       else:
-        self.tmpFilesR[ relIdTmp ].insertTuple( inputTuple );
+        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+        tempFile.insertTuple( inputTuple );
 
 
 

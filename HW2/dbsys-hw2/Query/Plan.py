@@ -210,6 +210,8 @@ class PlanBuilder:
     TableScan[...,cost=...](employee)
 
   >>> q5results = [query5.schema().unpack(tup) for page in db.processQuery(query5) for tup in page[1]]
+  >>> [(tup.id, tup.id2) for tup in q5results] # doctest:+ELLIPSIS
+  [(0, 0), (1, 1), (2, 2), ..., (18, 18), (19, 19)]
   >>> sorted([(tup.id, tup.id2) for tup in q5results]) # doctest:+ELLIPSIS
   [(0, 0), (1, 1), (2, 2), ..., (18, 18), (19, 19)]
 
