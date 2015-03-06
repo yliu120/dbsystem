@@ -96,16 +96,11 @@ class Join(Operator):
   # Iterator abstraction for join operator.
   def __iter__(self):
     self.initializeOutput();
-    if self.pipelined:
-      raise ValueError("Page-at-a-time processing not supported for joins");
-  
     self.outputIterator = self.processAllPages();
 
     return self;
 
   def __next__(self):
-    if self.pipelined:
-      raise ValueError("Page-at-a-time processing not supported for joins");
     return next(self.outputIterator);
 
   # Page-at-a-time operator processing
@@ -243,7 +238,51 @@ class Join(Operator):
   # Hash join implementation.
   #
   def hashJoin(self):
-    raise NotImplementedError
+    if self.joinExpr == None:
+      self.joinExpr = string(self.lhsKeySchema.fields) + "==" + string(self.rhsKeySchema.fields);
+      # what if KeySchema includes multiple fields?
+      # what if joinExpr is a range comparison?
+    
+    self.tmpFilesL = dict();
+    self.tmpFilesR = dict();
+    
+    for PageId, Page in iter(self.lhsPlan):
+      self.buildHashL(PageId, Page);
+    for PageId, Page in iter(self.rhsPlan):
+      self.buildHashR(PageId, Page);
+
+  def buildHashL(self, PageId, Page):
+    inputSchema  = self.lhsSchema;
+    for inputTuple in page:
+      inputL = self.loadSchema(inputSchema, inputTuple);
+      
+      relIdTmp = self.relationId() + eval(self.lhsHashFn, globals(), inputL) + "HashJoinTmp";
+    
+      if not(self.storage.hasRelation(relIdTmp)):
+        self.storage.createRelation(relIdTmp, inputSchema);
+        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+        self.tmpFilesL[ relIdTmp ] = tempFile;
+        tempFile.insertTuple( inputTuple );
+      
+      else:
+        self.tmpFilesL[ relIdTmp ].insertTuple( inputTuple );
+
+  def buildHashR(self, PageId, Page):
+    inputSchema  = self.rhsSchema;
+    for inputTuple in page:
+      inputR = self.loadSchema(inputSchema, inputTuple);
+      
+      relIdTmp = self.relationId() + eval(self.rhsHashFn, globals(), inputR) + "HashJoinTmp";
+      
+      if not(self.storage.hasRelation(relIdTmp)):
+        self.storage.createRelation(relIdTmp, inputSchema);
+        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+        self.tmpFilesR[ relIdTmp ] = tempFile;
+        tempFile.insertTuple( inputTuple );
+      
+      else:
+        self.tmpFilesR[ relIdTmp ].insertTuple( inputTuple );
+
 
 
   # Plan and statistics information
