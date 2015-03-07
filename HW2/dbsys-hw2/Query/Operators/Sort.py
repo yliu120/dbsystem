@@ -96,6 +96,7 @@ class Sort(Operator):
         page.setDirty(False);
         
       self.cleanBufferPool(bufPool);
+      runId += 1;
       
     # pass 1 ... N
 
@@ -178,3 +179,4 @@ class Sort(Operator):
       except StopIteration:
         pass
     
+      outputFile.insertTuple( tupleData );
