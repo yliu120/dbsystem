@@ -179,7 +179,6 @@ class Sort(Operator):
       try:
         nextTuple = next(g);
         heappush(heap, ( sortKeyFnTuple( nextTuple ), order, nextTuple, g ));
-        #print("kwaymerge: " + str(value));
       except StopIteration:
         pass
     
