@@ -1,3 +1,9 @@
+############################################################
+# This is a general implementation on k-way merge algorithm
+# using min-heap 
+# Author: Yunlong Liu
+############################################################
+
 import heapq;
 
 class kWayMergeSort:
