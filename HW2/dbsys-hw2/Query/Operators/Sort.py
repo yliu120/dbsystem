@@ -12,6 +12,8 @@ class Sort(Operator):
 
     if self.sortKeyFn is None or self.sortKeyDesc is None:
       raise ValueError("No sort key extractor provided to a sort operator")
+  
+    self.tmpFileMap = dict();
 
   # Returns the output schema of this operator
   def schema(self):
@@ -71,7 +73,7 @@ class Sort(Operator):
       while( bufpool.numFreePages() > 0 ):
         bufpool.getPage( pageId, True );
       
-      for (pageId, (_, page, _)) in self.pageMap.items():
+      for (pageId, (_, page, _)) in bufpool.pageMap.items():
         self.pageSort(page);
       
       
@@ -120,3 +122,21 @@ class Sort(Operator):
           bufPool.flushPage( pageId );
         # evict without flush
         bufPool.discardPage( pageId );
+        
+  def getTmpFile(self, passId, runId):
+    
+    if self.sortKeyDesc:
+      relIdTmp = self.relationId() + "_" + self.sortKeyDesc + "_" + str(passId) + "+" + str(runId);
+    else:
+      relIdTmp = self.relationId() + "_" + "sort" + "_" + str(passId) + "+" + str(runId);
+    
+    if not(self.storage.hasRelation(relIdTmp)):
+      self.storage.createRelation(relIdTmp, self.subPlan.schema());
+      tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+      
+      if passId in self.tmpFileMap:
+        self.tmpFileMap[ passId ].append(relIdTmp);
+      else:
+        self.tmpFileMap[ passId ] = [];
+        
+    return self.storage.fileMgr.relationFile(relIdTmp)[1];
