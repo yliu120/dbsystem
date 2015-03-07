@@ -95,10 +95,15 @@ class Join(Operator):
 
   # Iterator abstraction for join operator.
   def __iter__(self):
-    return NotImplementedError
+    self.initializeOutput();
+    self.inputIteratorL = iter(self.lhsPlan);
+    self.inputIteratorR = iter(self.rhsPlan);
+    self.outputIterator = self.processAllPages();
+
+    return self;
 
   def __next__(self):
-    return NotImplementedError
+    return next(self.outputIterator);
 
   # Page-at-a-time operator processing
   def processInputPage(self, pageId, page):
@@ -159,23 +164,27 @@ class Join(Operator):
   # for its block of the outer relation.
 
   def blockNestedLoops(self):
-    for pageBlock in accessPageBlock(self.storage.bufferpool, iter(self.lhsPlan)):
+    for pageBlock in self.accessPageBlock(self.storage.bufferPool, self.inputIteratorL):
       for lPageId in pageBlock:
-        lhsPage = self.storage.bufferpool.getPage(lPageId);
+        lhsPage = self.storage.bufferPool.getPage(lPageId);
         for lTuple in lhsPage:
           joinExprEnv = self.loadSchema(self.lhsSchema, lTuple);
                   
-          for (rPageId, rhsPage) in iter(self.rhsPlan):
+          for (rPageId, rhsPage) in self.inputIteratorR:
             for rTuple in rhsPage:
-              joinExprEnv.update(self.loadSchema(self.rhsSchema, rTuple))
+              joinExprEnv.update(self.loadSchema(self.rhsSchema, rTuple));
                     
               if eval(self.joinExpr, globals(), joinExprEnv):
                 outputTuple = self.joinSchema.instantiate(*[joinExprEnv[f] for f in self.joinSchema.fields]);
-                self.emitOutputTuple(self.joinSchema.pack(outputTuple));     
+                self.emitOutputTuple(self.joinSchema.pack(outputTuple));
+          
+          if self.outputPages:
+            self.outputPages = [self.outputPages[-1]];
         
-        self.storage.bufferpool.unpinPage(lPageId);
-        self.storage.bufferpool.discardPage(lPageId);
-    
+        self.storage.bufferPool.unpinPage(lPageId);
+        self.storage.bufferPool.discardPage(lPageId);
+        
+    return self.storage.pages(self.relationId());
 
   # Accesses a block of pages from an iterator.
   # This method pins pages in the buffer pool during its access.
@@ -220,7 +229,7 @@ class Join(Operator):
       if not(pinCount == 0):
         raise RuntimeError("Unable to clean bufferpool. Memory leaks?");
       else:
-        if (pageId.isDirty()):
+        if (page.isDirty()):
           # evict with flush
           bufPool.flushPage( pageId );
         # evict without flush
@@ -231,7 +240,66 @@ class Join(Operator):
   # Hash join implementation.
   #
   def hashJoin(self):
-    raise NotImplementedError
+    if self.joinExpr == None:
+      self.joinExpr = self.lhsKeySchema.fields[0] + "==" + self.rhsKeySchema.fields[0];
+      # what if KeySchema includes multiple fields?
+      # what if joinExpr is a range comparison?
+    
+    self.tmpFilesL = list();
+    self.tmpFilesR = list();
+    
+    for (PageId, Page) in self.inputIteratorL:
+      self.buildPartitionL(PageId, Page);
+    for (PageId, Page) in self.inputIteratorR:
+      self.buildPartitionR(PageId, Page);
+      
+    for relIdTmpL in self.tmpFilesL:
+      relIdTmpR = relIdTmpL.rstrip('L') + 'R';
+      if (self.storage.hasRelation(relIdTmpR)):
+        self.inputIteratorL = self.storage.pages(relIdTmpL);
+        self.inputIteratorR = self.storage.pages(relIdTmpR);
+        _ = self.blockNestedLoops();
+        
+        self.storage.removeRelation(relIdTmpL);
+        self.storage.removeRelation(relIdTmpR);
+    
+    return self.storage.pages(self.relationId());
+        
+
+  def buildPartitionL(self, PageId, Page):
+    inputSchema  = self.lhsSchema;
+    for inputTuple in Page:
+      inputL = self.loadSchema(inputSchema, inputTuple);
+      
+      relIdTmp = self.relationId() + str(eval(self.lhsHashFn, globals(), inputL)) + "HashJoinTmpL";
+    
+      if not(self.storage.hasRelation(relIdTmp)):
+        self.storage.createRelation(relIdTmp, inputSchema);
+        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+        tempFile.insertTuple( inputTuple );
+        self.tmpFilesL.append(relIdTmp);
+      
+      else:
+        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+        tempFile.insertTuple( inputTuple );
+
+  def buildPartitionR(self, PageId, Page):
+    inputSchema  = self.rhsSchema;
+    for inputTuple in Page:
+      inputR = self.loadSchema(inputSchema, inputTuple);
+      
+      relIdTmp = self.relationId() + str(eval(self.rhsHashFn, globals(), inputR)) + "HashJoinTmpR";
+      
+      if not(self.storage.hasRelation(relIdTmp)):
+        self.storage.createRelation(relIdTmp, inputSchema);
+        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+        tempFile.insertTuple( inputTuple );
+        self.tmpFilesR.append(relIdTmp);
+      
+      else:
+        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
+        tempFile.insertTuple( inputTuple );
+
 
 
   # Plan and statistics information

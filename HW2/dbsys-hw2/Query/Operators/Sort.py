@@ -31,11 +31,20 @@ class Sort(Operator):
 
 
   # Iterator abstraction for external sort operator.
+  # Apparently, external sort must not support page-at-a-time
+  # We apply a similar iterator implementation here as GroupBy
   def __iter__(self):
-    raise NotImplementedError
+      
+    self.initializeOutput();
+    self.inputIterator = iter(self.subPlan);
+    self.inputFinished = False;
+    
+    self.outputIterator = self.processAllPages();
+    
+    return self
 
-  def __next__(self):
-    raise NotImplementedError
+  def __next__(self):  
+    return next(self.outputIterator);
 
 
   # Page processing and control methods
@@ -46,7 +55,12 @@ class Sort(Operator):
 
   # Set-at-a-time operator processing
   def processAllPages(self):
-    raise NotImplementedError
+    
+    # local variable
+    schema  = self.schema();
+    
+    # pass 0
+    
 
 
   # Plan and statistics information
@@ -61,3 +75,32 @@ class Sort(Operator):
   def selectivity(self):
     return 1.0
 
+  # This function is a helper function on pass 0. 
+  # This is not an in-place version...
+  def pageSort(self, page):
+    
+    pageIterator = iter(page);
+    pageId       = page.pageId;
+    schema       = self.subPlan.schema();
+    tmpList      = sorted(pageIterator, key = lambda e : self.sortKeyFn(schema.unpack(e)) );
+    
+    id = 0;
+    for tupleData in tmpList:
+      page.putTuple( TupleId(pageId, id), tupleData );
+      id += 1;
+      
+  # Another helper function that borrowed from Join.py
+  # We need to clean buffer pool before using
+  # clean buffer pool before use
+  def cleanBufferPool(self, bufPool):
+
+    # evict out clean pages and flush dirty pages
+    for (pageId, (_, page, pinCount)) in bufPool.pageMap.items():
+      if not(pinCount == 0):
+        raise RuntimeError("Unable to clean bufferpool. Memory leaks?");
+      else:
+        if (page.isDirty()):
+          # evict with flush
+          bufPool.flushPage( pageId );
+        # evict without flush
+        bufPool.discardPage( pageId );
