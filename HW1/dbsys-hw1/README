@@ -11,6 +11,9 @@ For SlottedPage Workload Test:
 For PaxPage:
 ./runPaxPage
 
+For Page:
+./runPage
+
 
 Attention:
 1) Please use the API framework that we submitted. Since in
@@ -22,3 +25,7 @@ Bug 1: removeRelation() -> rFile.path should be rFile.filePath
 Bug 2: writePage( page ) -> there is no global pageId that can 
        be locally called.
 ...
+
+2) Please check the timefig-SlottedPage.png as a sample result
+we get from the tpch-sf0.1 dataset. We have limited time to run
+data with the larger dataset.
