@@ -84,8 +84,8 @@ class Sort(Operator):
       pageIterators = [];
       orderId       = 0 ;
       for (pageId, (_, page, _)) in bufPool.pageMap.items():
-        self.pageSort(page, pageId);
-        pageIterators.append( (iter(page), orderId) );
+        #self.pageSort(page, pageId);
+        pageIterators.append( (self.pageSort(page, pageId), orderId) );
         orderId    += 1 ;
     
       self.kWayMergeOutput(pageIterators, tmpFile);
@@ -100,7 +100,6 @@ class Sort(Operator):
       
     # Check ready for output
     if self.isOutputReady( passId ):
-      print("isOutputReady??")
       return self.storage.pages(self.tmpFileMap[passId][0]);
     # pass 1 ... N
     
@@ -124,12 +123,8 @@ class Sort(Operator):
     
     pageIterator = iter(page);
     schema       = self.subPlan.schema();
-    tmpList      = sorted(pageIterator, key = lambda e : self.sortKeyFn(schema.unpack(e)) );
-    
-    id = 0;
-    for tupleData in tmpList:
-      page.putTuple( TupleId(pageId, id), tupleData );
-      id += 1;
+    for tuple in sorted(pageIterator, key = lambda e : self.sortKeyFn(schema.unpack(e)) ):
+      yield tuple;
       
   # Another helper function that borrowed from Join.py
   # We need to clean buffer pool before using
@@ -179,11 +174,12 @@ class Sort(Operator):
       heappush(heap, ( sortKeyFnTuple( tuple ), p[1], tuple, p[0] ));
     
     while ( heap != [] ):
-            
+      # Add an order to make the sorting stable;      
       (value, order, tupleData, g) = heappop(heap);
       try:
         nextTuple = next(g);
         heappush(heap, ( sortKeyFnTuple( nextTuple ), order, nextTuple, g ));
+        #print("kwaymerge: " + str(value));
       except StopIteration:
         pass
     
