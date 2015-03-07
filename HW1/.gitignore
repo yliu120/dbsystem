@@ -1,8 +1,4 @@
 # remove project files
-<<<<<<< HEAD
-data/
-=======
->>>>>>> c3846cc517a2fc5caaeb8b8e059d47842fd8e99f
 .DS_Store
 data
 .project
