@@ -1,1 +1,0 @@
-python3 RunWorkload.py pax | python plot.py "PAX"

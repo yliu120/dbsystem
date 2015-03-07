@@ -1,1 +1,0 @@
-python3 RunWorkload.py p | python plot.py "Page"
