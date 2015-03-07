@@ -39,10 +39,7 @@ class Sort(Operator):
   # We apply a similar iterator implementation here as GroupBy
   def __iter__(self):
       
-    self.initializeOutput();
     self.inputIterator = iter(self.subPlan);
-    self.inputFinished = False;
-    
     self.outputIterator = self.processAllPages();
     
     return self
@@ -100,8 +97,13 @@ class Sort(Operator):
         
       self.cleanBufferPool(bufPool);
       runId += 1;
-      print("complete pass 0 and run " + str(runId));
+      
+    # Check ready for output
+    if self.isOutputReady( passId ):
+      print("isOutputReady??")
+      return self.storage.pages(self.tmpFileMap[passId][0]);
     # pass 1 ... N
+    
     
       
   # Plan and statistics information
@@ -160,7 +162,7 @@ class Sort(Operator):
       if passId in self.tmpFileMap:
         self.tmpFileMap[ passId ].append(relIdTmp);
       else:
-        self.tmpFileMap[ passId ] = [];
+        self.tmpFileMap[ passId ] = [ relIdTmp ];
         
     return self.storage.fileMgr.relationFile(relIdTmp)[1];
 
@@ -186,3 +188,6 @@ class Sort(Operator):
         pass
     
       outputFile.insertTuple( tupleData );
+      
+  def isOutputReady(self, passId):
+    return True if len(self.tmpFileMap[passId]) == 1 else False;
