@@ -82,11 +82,12 @@ class Sort(Operator):
       tmpFile = self.getTmpFile(passId, runId);
       # here the heap has size with B-1, in place
       pageIterators = [];
+      orderId       = 0 ;
       for (pageId, (_, page, _)) in bufPool.pageMap.items():
         self.pageSort(page, pageId);
-        pageIterators.append( iter(page) );
+        pageIterators.append( (iter(page), orderId) );
+        orderId    += 1 ;
     
-      print("Debugger: Each page is sorted");
       self.kWayMergeOutput(pageIterators, tmpFile);
       
       for (pageId, (_, page, _)) in bufPool.pageMap.items():
@@ -167,15 +168,15 @@ class Sort(Operator):
     # redefine the function locally
     sortKeyFnTuple = lambda e : self.sortKeyFn(schema.unpack(e));
     for p in pageIterators:
-      tuple = next(p);
-      heappush(heap, ( sortKeyFnTuple( tuple ), tuple, p ));
+      tuple = next(p[0]);
+      heappush(heap, ( sortKeyFnTuple( tuple ), p[1], tuple, p[0] ));
     
-    while ( self.heap != [] ):
+    while ( heap != [] ):
             
-      (value, tupleData, g) = heappop(heap);
+      (value, order, tupleData, g) = heappop(heap);
       try:
         nextTuple = next(g);
-        heapq.heappush(self.heap, ( sortKeyFnTuple( nextTuple ), nextTuple, g ));
+        heappush(heap, ( sortKeyFnTuple( nextTuple ), order, nextTuple, g ));
       except StopIteration:
         pass
     
