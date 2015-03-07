@@ -46,7 +46,6 @@ class Sort(Operator):
   def __next__(self):  
     return next(self.outputIterator);
 
-
   # Page processing and control methods
 
   # Page-at-a-time operator processing
@@ -59,7 +58,25 @@ class Sort(Operator):
     # local variable
     schema  = self.schema();
     
+    # perpare bufferpool
+    bufpool = self.storage.bufferpool;
+    self.cleanBufferPool(bufPool);
+    
+    passId  = 0;
+    runId   = 0;
     # pass 0
+    while( self.inputIterator ):
+      
+      (pageId, page) = next(self.inputIterator);
+      while( bufpool.numFreePages() > 0 ):
+        bufpool.getPage( pageId, True );
+      
+      for (pageId, (_, page, _)) in self.pageMap.items():
+        self.pageSort(page);
+      
+      
+      
+      
     
 
 
@@ -77,10 +94,9 @@ class Sort(Operator):
 
   # This function is a helper function on pass 0. 
   # This is not an in-place version...
-  def pageSort(self, page):
+  def pageSort(self, page, pageId):
     
     pageIterator = iter(page);
-    pageId       = page.pageId;
     schema       = self.subPlan.schema();
     tmpList      = sorted(pageIterator, key = lambda e : self.sortKeyFn(schema.unpack(e)) );
     
