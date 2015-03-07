@@ -1,6 +1,8 @@
 from Catalog.Schema import DBSchema
 from Query.Operator import Operator
 
+from heapq import heappush, heappop
+
 # Operator for External Sort
 class Sort(Operator):
 
@@ -13,6 +15,9 @@ class Sort(Operator):
     if self.sortKeyFn is None or self.sortKeyDesc is None:
       raise ValueError("No sort key extractor provided to a sort operator")
   
+    if self.sortKeyFn:
+      self.sortKeyFnTuple = lambda e : self.sortKeyFn(schema.unpack(e));
+    
     self.tmpFileMap = dict();
 
   # Returns the output schema of this operator
@@ -70,18 +75,32 @@ class Sort(Operator):
     while( self.inputIterator ):
       
       (pageId, page) = next(self.inputIterator);
-      while( bufpool.numFreePages() > 0 ):
-        bufpool.getPage( pageId, True );
       
+      # The algorithm should be like this.
+      # From pass 0, we sort B-1 page and do a B-1-way merge
+      # But we need to keep one output page in the bufferpool
+      while( bufpool.numFreePages() > 1 ):
+        bufpool.getPage( pageId, True );
+        
+      tmpFile = self.getTmpFile(passId, runId);
+      # here the heap has size with B-1, in place
+      pageIterators = [];
       for (pageId, (_, page, _)) in bufpool.pageMap.items():
         self.pageSort(page);
+        pageIterators.append( iter(page) );
+        
+      self.kWayMergeOutput(pageIterators, tmpFile);
       
+      for (pageId, (_, page, _)) in bufpool.pageMap.items():
+        bufpool.unpinPage( pageId );
+        page.setDirty(False);
+        
+      self.cleanBufferPool(bufPool);
       
-      
-      
+    # pass 1 ... N
+
     
-
-
+      
   # Plan and statistics information
 
   # Returns a single line description of the operator.
@@ -140,3 +159,22 @@ class Sort(Operator):
         self.tmpFileMap[ passId ] = [];
         
     return self.storage.fileMgr.relationFile(relIdTmp)[1];
+
+  def kWayMergeOutput(self, pageIterators, outputFile):
+    
+    heap = [];
+    tupleId = None;
+    
+    for p in pageIterators:
+      tuple = next(p);
+      heappush(heap, ( self.sortKeyFnTuple( tuple ), tuple, p ));
+    
+    while ( self.heap != [] ):
+            
+      (value, tupleData, g) = heappop(heap);
+      try:
+        nextTuple = next(g);
+        heapq.heappush(self.heap, ( self.sortKeyFnTuple( nextTuple ), nextTuple, g ));
+      except StopIteration:
+        pass
+    
