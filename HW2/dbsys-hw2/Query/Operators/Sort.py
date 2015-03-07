@@ -63,12 +63,14 @@ class Sort(Operator):
     schema  = self.schema();
     
     # perpare bufferpool
-    bufPool = self.storage.bufferPool;
+    bufPool       = self.storage.bufferPool;
+    passId        = 0;
+    runId         = 0;
+    inputFinished = False;
+    
     self.cleanBufferPool(bufPool);
-    passId  = 0;
-    runId   = 0;
     # pass 0
-    while( self.inputIterator ):
+    while( not(inputFinished) ):
       # The algorithm should be like this.
       # From pass 0, we sort B-1 page and do a B-1-way merge
       # But we need to keep one output page in the bufferpool
@@ -77,6 +79,7 @@ class Sort(Operator):
           (pageId, page) = next(self.inputIterator);
           bufPool.getPage( pageId, True );
         except StopIteration:
+          inputFinished = True;
           break;
         
       tmpFile = self.getTmpFile(passId, runId);
@@ -90,9 +93,10 @@ class Sort(Operator):
     
       self.kWayMergeOutput(pageIterators, tmpFile);
       
-      for (pageId, (_, page, _)) in bufPool.pageMap.items():
-        bufPool.unpinPage( pageId );
-        page.setDirty(False);
+      for (pageId, (_, page, pinCount)) in bufPool.pageMap.items():
+        if pinCount > 0:
+          bufPool.unpinPage( pageId );
+          page.setDirty(False);
         
       self.cleanBufferPool(bufPool);
       runId += 1;
@@ -133,7 +137,8 @@ class Sort(Operator):
     # evict out clean pages and flush dirty pages
     for (pageId, (_, page, pinCount)) in bufPool.pageMap.items():
       if not(pinCount == 0):
-        raise RuntimeError("Unable to clean bufferpool. Memory leaks?");
+        raise RuntimeError("Unable to clean bufferpool. Memory leaks?" + "(PageId: " \
+                           + str(pageId.pageIndex) + " pinCount: " + str(pinCount));
       else:
         if (page.isDirty()):
           # evict with flush
