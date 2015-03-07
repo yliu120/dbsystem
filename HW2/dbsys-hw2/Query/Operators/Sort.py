@@ -1,6 +1,6 @@
 from Catalog.Schema import DBSchema
+from Catalog.Identifiers import TupleId
 from Query.Operator import Operator
-
 from heapq import heappush, heappop
 
 # Operator for External Sort
@@ -14,9 +14,6 @@ class Sort(Operator):
 
     if self.sortKeyFn is None or self.sortKeyDesc is None:
       raise ValueError("No sort key extractor provided to a sort operator")
-  
-    if self.sortKeyFn:
-      self.sortKeyFnTuple = lambda e : self.sortKeyFn(schema.unpack(e));
     
     self.tmpFileMap = dict();
 
@@ -66,40 +63,40 @@ class Sort(Operator):
     schema  = self.schema();
     
     # perpare bufferpool
-    bufpool = self.storage.bufferpool;
+    bufPool = self.storage.bufferPool;
     self.cleanBufferPool(bufPool);
-    
     passId  = 0;
     runId   = 0;
     # pass 0
     while( self.inputIterator ):
-      
-      (pageId, page) = next(self.inputIterator);
-      
       # The algorithm should be like this.
       # From pass 0, we sort B-1 page and do a B-1-way merge
       # But we need to keep one output page in the bufferpool
-      while( bufpool.numFreePages() > 1 ):
-        bufpool.getPage( pageId, True );
+      while( bufPool.numFreePages() > 1 ):
+        try:
+          (pageId, page) = next(self.inputIterator);
+          bufPool.getPage( pageId, True );
+        except StopIteration:
+          break;
         
       tmpFile = self.getTmpFile(passId, runId);
       # here the heap has size with B-1, in place
       pageIterators = [];
-      for (pageId, (_, page, _)) in bufpool.pageMap.items():
-        self.pageSort(page);
+      for (pageId, (_, page, _)) in bufPool.pageMap.items():
+        self.pageSort(page, pageId);
         pageIterators.append( iter(page) );
-        
+    
+      print("Debugger: Each page is sorted");
       self.kWayMergeOutput(pageIterators, tmpFile);
       
-      for (pageId, (_, page, _)) in bufpool.pageMap.items():
-        bufpool.unpinPage( pageId );
+      for (pageId, (_, page, _)) in bufPool.pageMap.items():
+        bufPool.unpinPage( pageId );
         page.setDirty(False);
         
       self.cleanBufferPool(bufPool);
       runId += 1;
-      
+      print("complete pass 0 and run " + str(runId));
     # pass 1 ... N
-
     
       
   # Plan and statistics information
@@ -163,19 +160,22 @@ class Sort(Operator):
 
   def kWayMergeOutput(self, pageIterators, outputFile):
     
-    heap = [];
+    heap    = [];
     tupleId = None;
+    schema  = self.subPlan.schema();
     
+    # redefine the function locally
+    sortKeyFnTuple = lambda e : self.sortKeyFn(schema.unpack(e));
     for p in pageIterators:
       tuple = next(p);
-      heappush(heap, ( self.sortKeyFnTuple( tuple ), tuple, p ));
+      heappush(heap, ( sortKeyFnTuple( tuple ), tuple, p ));
     
     while ( self.heap != [] ):
             
       (value, tupleData, g) = heappop(heap);
       try:
         nextTuple = next(g);
-        heapq.heappush(self.heap, ( self.sortKeyFnTuple( nextTuple ), nextTuple, g ));
+        heapq.heappush(self.heap, ( sortKeyFnTuple( nextTuple ), nextTuple, g ));
       except StopIteration:
         pass
     
