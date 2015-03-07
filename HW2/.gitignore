@@ -1,4 +1,6 @@
 # remove project files
+data/
+.DS_Store
 .project
 .pydevproject
 # Byte-compiled / optimized / DLL files
