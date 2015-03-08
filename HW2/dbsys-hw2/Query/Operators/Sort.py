@@ -187,7 +187,6 @@ class Sort(Operator):
   def kWayMergeOutput(self, pageIterators, outputFile):
     
     heap    = [];
-    tupleId = None;
     schema  = self.subPlan.schema();
     
     # redefine the function locally
@@ -210,6 +209,14 @@ class Sort(Operator):
   # Here we provide a k-way merge output for pass 1, 2, 3.. N
   # This function differs from the previous one by including file iterators
   def kWayMergeOutputWithFile(self, bufPool, fileIterators, outputFile):
+    
+    heap    = [];
+    schema  = self.subPlan.schema();
+    
+    # redefine the function locally
+    sortKeyFnTuple = lambda e : self.sortKeyFn(schema.unpack(e));
+    
+    
     
     
     
