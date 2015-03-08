@@ -12,14 +12,14 @@ import random
 
 
 db = Database.Database()
-db.createRelation('employee', [('id', 'int'), ('age', 'int')])
+db.createRelation('employee', [('id', 'int'), ('age', 'int'), ('desc', 'char(40)')])
 schema = db.relationSchema('employee')
 
-for tup in [schema.pack(schema.instantiate(i, random.randint(0,50))) for i in range(0,20)]:
+for tup in [schema.pack(schema.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,2000)]:
   _ = db.insertTuple(schema.name, tup)
 
 
-e2schema   = schema.rename('employee2', {'id':'id2', 'age':'age2'})
+e2schema   = schema.rename('employee2', {'id':'id2', 'age':'age2', 'desc':'desc2'})
 keySchema  = DBSchema('employeeKey',  [('id', 'int')])
 keySchema2 = DBSchema('employeeKey2', [('id2', 'int')])
   
@@ -31,11 +31,14 @@ query5 = db.query().fromTable('employee').join( \
           rhsHashFn='hash(id2) % 4', rhsKeySchema=keySchema2, \
         ).finalize()
 
-print(query5.explain())
+print(query5.explain());
 
-q5results = [query5.schema().unpack(tup) for page in db.processQuery(query5) for tup in page[1]]
+def readResult():
+    for page in db.processQuery(query5):
+        for tup in page[1]:
+            yield query5.schema().unpack(tup);
 
+q5result = readResult();
 
-print([(tup.id, tup.id2) for tup in q5results]);
-print([tup for tup in q5results]);
-print( len(q5results) );
+while( q5result ):
+    print(next(q5result));
