@@ -121,7 +121,7 @@ class Sort(Operator):
           firstPage     = next( fileIterator );
           firstPageIter = iter( firstPage ); 
           bufPool.getPage( firstPage.pageId, True );
-          fileIterators[ (firstPageIter, orderId) ] = fileIterator;
+          fileIterators[ (firstPage.pageId, firstPageIter, orderId) ] = fileIterator;
           orderId      += 1;
         
         # run k-way merge sort for this run
@@ -235,18 +235,41 @@ class Sort(Operator):
     sortKeyFnTuple = lambda e : self.sortKeyFn(schema.unpack(e));
     
     # initialize heap
-    for (tupleIter, orderId) in fileIterators.keys():
+    for (pageId, tupleIter, orderId) in fileIterators.keys():
       tuple = next(tupleIter);
-      heappush(heap, ( sortKeyFnTuple( tuple ), orderId, tuple, tupleIter ) );
+      heappush(heap, ( sortKeyFnTuple( tuple ), orderId, tuple, tupleIter, pageId ) );
     
     while( heap != [] ):
       
-      (value, order, tupleData, g) = heappop(heap);  
-      
+      (key, order, tupleData, tupleIter, pageId) = heappop(heap);  
+      try:
+        nextTuple = next( tupleIter );
+        heappush(heap, ( sortKeyFnTuple( nextTuple ), order, nextTuple, tupleIter, pageId ));
+      except StopIteration:
+          
+        bufPool.unpinPage( pageId );
+        bufPool.discardPage( pageId );
+        fileIter  = fileIterators[(pageId, tupleIter, order)];
+        
+        # We open up a new page
+        try:
+          nextPage = next( fileIter );
+          nextIter = iter( nextPage );
+          # We add the nextPage to our dictionary and buffer pool.
+          fileIterators[(nextPage.pageId, nextIter, order)] = fileIter;
+          del fileIterators[(pageId, tupleIter, order)];
+          # pin the new next page in the bufferpool
+          bufPool.pinPage( nextPage.pageId );
+          # keep our heap structure
+          nextTuple = next( nextIter );
+          heappush(heap, ( sortKeyFnTuple( nextTuple ), order, nextTuple, nextIter, nextPage.pageId ) );
+        except StopIteration:
+          pass
     
+      outputFile.insertTuple( tupleData );
     
-    
-    
+    # clean up
+    del heap;
       
   def isOutputReady(self, passId):
     return True if len(self.tmpFileMap[passId]) == 1 else False;
