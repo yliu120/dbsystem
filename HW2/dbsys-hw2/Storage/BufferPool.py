@@ -89,6 +89,7 @@ class BufferPool:
 
       else:
         # Fetch the page from the file system, adding it to the buffer pool
+        print("Fetching page from the file system");
         if not self.freeList:
           self.evictPage()
 
