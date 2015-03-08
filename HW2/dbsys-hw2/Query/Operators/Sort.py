@@ -114,7 +114,9 @@ class Sort(Operator):
           except StopIteration:
             break;
         
-          firstPageIter = iter( next(fileIterator) ); 
+          firstPage     = next( fileIterator );
+          firstPageIter = iter( firstPage ); 
+          bufPool.getPage( firstPage.pageId, True );
           fileIterators[ firstPageIter ] = fileIterator;
         
         # run k-way merge sort for this run
@@ -208,6 +210,7 @@ class Sort(Operator):
   # Here we provide a k-way merge output for pass 1, 2, 3.. N
   # This function differs from the previous one by including file iterators
   def kWayMergeOutputWithFile(self, bufPool, fileIterators, outputFile):
+    
     
     
       
