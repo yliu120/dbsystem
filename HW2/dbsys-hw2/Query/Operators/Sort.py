@@ -99,12 +99,15 @@ class Sort(Operator):
       runId += 1;
       
     # Check ready for output
-    if self.isOutputReady( passId ):
-      return self.storage.pages(self.tmpFileMap[passId][0]);
+    # if true then return the output iterator
+    # if false then goto pass 1...N
+    while( not(self.isOutputReady( passId )) ):
     # pass 1 ... N
-    
-    
+      passId += 1;
+      runId   = 0;
       
+    
+    return self.storage.pages(self.tmpFileMap[passId][0]);  
   # Plan and statistics information
 
   # Returns a single line description of the operator.
