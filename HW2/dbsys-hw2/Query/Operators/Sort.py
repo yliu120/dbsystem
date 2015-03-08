@@ -103,11 +103,14 @@ class Sort(Operator):
     # if false then goto pass 1...N
     while( not(self.isOutputReady( passId )) ):
       # implementing pass 1 ... N
-      while( self.tmpFileMap[ passId ] != [] ):
+      
+      listIterator  = iter( self.tmpFileMap[ passId ] );
+      while( True ):
         # implementing runs 0 ... M 
         fileIterators = dict();
-        listIterator  = iter( self.tmpFileMap[ passId ] );
-        # Pull corresponding files to the buffer pool  
+        # Pull corresponding files to the buffer pool 
+        # orderId is to make the sorting algorithm stable 
+        orderId       = 0; 
         while( bufPool.numFreePages() > 1 ):
           try:
             fileIterator  = self.storage.fileMgr.relationFile( next(listIterator) )[1].pages();
@@ -117,16 +120,25 @@ class Sort(Operator):
           firstPage     = next( fileIterator );
           firstPageIter = iter( firstPage ); 
           bufPool.getPage( firstPage.pageId, True );
-          fileIterators[ firstPageIter ] = fileIterator;
+          fileIterators[ (firstPageIter, orderId) ] = fileIterator;
+          orderId      += 1;
         
         # run k-way merge sort for this run
         tmpFile = self.getTmpFile( passId + 1, runId );
         self.kWayMergeOutputWithFile(bufPool, fileIterators, tmpFile);
         
-        runId += 1;
         # End run
+        runId += 1;
+        # End run cleanup
+        self.cleanBufferPool(bufPool);
+      
+      # End pass
+      # End pass cleanup
+      for relTmp in self.tmpFileMap[ passId ]:
+        self.storage.fileMgr.removeRelation( relTmp );
+      del self.tmpFileMap[ passId ];
       passId += 1;
-      # End pass  
+     
     return self.storage.pages(self.tmpFileMap[passId][0]);  
   # Plan and statistics information
 
@@ -215,7 +227,9 @@ class Sort(Operator):
     
     # redefine the function locally
     sortKeyFnTuple = lambda e : self.sortKeyFn(schema.unpack(e));
-    
+    # initialize heap
+    for p in file:
+      raise NotImplemented;
     
     
     
