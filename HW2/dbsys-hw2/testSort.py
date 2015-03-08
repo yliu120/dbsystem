@@ -12,10 +12,10 @@ import random
 
 
 db = Database.Database()
-db.createRelation('employee', [('id', 'int'), ('age', 'int')])
+db.createRelation('employee', [('id', 'int'), ('age', 'int'), ('desp', 'char(50)')])
 schema = db.relationSchema('employee')
 
-for tup in [schema.pack(schema.instantiate(i, random.randint(0,50))) for i in range(0,20000)]:
+for tup in [schema.pack(schema.instantiate(i, random.randint(0,50), "Testing tuples with random ages. I am sure about it.")) for i in range(0,100000)]:
   _ = db.insertTuple(schema.name, tup)
 
 
@@ -33,5 +33,12 @@ print( len(q6results) );
 q7 = db.query().fromTable('employee').order(sortKeyFn=lambda x: x.age, sortKeyDesc='age').finalize();
 print(q7.explain());
 
-q7results = [q7.schema().unpack(tup) for page in db.processQuery(q7) for tup in page[1]]
-print(q7results);
+def readResult():
+    for page in db.processQuery(q7):
+        for tup in page[1]:
+            yield q7.schema().unpack(tup);
+
+q7result = readResult();
+
+while( q7result ):
+    print(next(q7result));

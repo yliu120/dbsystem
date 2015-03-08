@@ -3,6 +3,8 @@ from Catalog.Identifiers import TupleId
 from Query.Operator import Operator
 from heapq import heappush, heappop
 
+import gc;
+
 # Operator for External Sort
 class Sort(Operator):
 
@@ -105,7 +107,9 @@ class Sort(Operator):
     while( not(self.isOutputReady( passId )) ):
       
       listIterator  = iter( self.tmpFileMap[ passId ] );
-      while( listIterator ):
+      passId       += 1;
+      runId         = 0;
+      while( not(listIterator is None) ):
         # implementing runs 0 ... M 
         fileIterators = dict();
         # Pull corresponding files to the buffer pool 
@@ -115,30 +119,30 @@ class Sort(Operator):
           try:
             fileIterator  = self.storage.fileMgr.relationFile( next(listIterator) )[1].pages();
           except StopIteration:
-            del listIterator;
+            listIterator = None;
             break;
         
-          firstPage     = next( fileIterator );
-          firstPageIter = iter( firstPage ); 
-          bufPool.getPage( firstPage.pageId, True );
-          fileIterators[ (firstPage.pageId, firstPageIter, orderId) ] = fileIterator;
+          (pId, firstPage)     = next( fileIterator );
+          firstPageIter        = iter( firstPage ); 
+          bufPool.getPage( pId, True );
+          fileIterators[ ( pId, firstPageIter, orderId) ] = fileIterator;
+          
           orderId      += 1;
         
         # run k-way merge sort for this run
-        tmpFile = self.getTmpFile( passId + 1, runId );
+        tmpFile = self.getTmpFile( passId, runId );
         self.kWayMergeOutputWithFile(bufPool, fileIterators, tmpFile);
         
         # End run
         runId += 1;
         # End run cleanup
         self.cleanBufferPool(bufPool);
-      
       # End pass
       # End pass cleanup
-      for relTmp in self.tmpFileMap[ passId ]:
+      for relTmp in self.tmpFileMap[ passId - 1 ]:
         self.storage.fileMgr.removeRelation( relTmp );
-      del self.tmpFileMap[ passId ];
-      passId += 1;
+      del self.tmpFileMap[ passId - 1 ];
+      del listIterator;
      
     return self.storage.pages(self.tmpFileMap[passId][0]);  
   # Plan and statistics information
@@ -218,7 +222,7 @@ class Sort(Operator):
         pass
     
       outputFile.insertTuple( tupleData );
-    
+
     # clean up heap
     del heap;
   
@@ -253,21 +257,21 @@ class Sort(Operator):
         
         # We open up a new page
         try:
-          nextPage = next( fileIter );
-          nextIter = iter( nextPage );
+          (nextpId, nextPage) = next( fileIter );
+          nextIter            = iter( nextPage );
           # We add the nextPage to our dictionary and buffer pool.
-          fileIterators[(nextPage.pageId, nextIter, order)] = fileIter;
+          fileIterators[(nextpId, nextIter, order)] = fileIter;
           del fileIterators[(pageId, tupleIter, order)];
           # pin the new next page in the bufferpool
-          bufPool.pinPage( nextPage.pageId );
+          bufPool.pinPage( nextpId );
           # keep our heap structure
           nextTuple = next( nextIter );
-          heappush(heap, ( sortKeyFnTuple( nextTuple ), order, nextTuple, nextIter, nextPage.pageId ) );
+          heappush(heap, ( sortKeyFnTuple( nextTuple ), order, nextTuple, nextIter, nextpId ) );
         except StopIteration:
           pass
     
       outputFile.insertTuple( tupleData );
-    
+
     # clean up
     del heap;
       
