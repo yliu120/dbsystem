@@ -130,7 +130,6 @@ class Sort(Operator):
           orderId      += 1;
         
         # run k-way merge sort for this run
-        print("Stack into tmpFile")
         tmpFile = self.getTmpFile( passId, runId );
         self.kWayMergeOutputWithFile(bufPool, fileIterators, tmpFile);
         

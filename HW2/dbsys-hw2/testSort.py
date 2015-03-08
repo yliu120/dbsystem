@@ -41,4 +41,4 @@ def readResult():
 q7result = readResult();
 
 while( q7result ):
-    print(q7result.next());
+    print(next(q7result));
