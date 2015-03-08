@@ -25,7 +25,7 @@ class BufferPool:
 
   """
 
-  defaultPoolSize = 128 * (1 << 20)
+  defaultPoolSize = 1 * (1 << 20)
 
   def __init__(self, **kwargs):
     other = kwargs.get("other", None)
