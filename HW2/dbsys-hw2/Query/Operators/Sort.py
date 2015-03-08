@@ -218,19 +218,31 @@ class Sort(Operator):
         pass
     
       outputFile.insertTuple( tupleData );
+    
+    # clean up heap
+    del heap;
   
   # Here we provide a k-way merge output for pass 1, 2, 3.. N
   # This function differs from the previous one by including file iterators
+  # bufpool: the bufferpool associated with this operator
+  # fileIterators: in form: <(firstPageTupleIter, orderId), fileIterator>
+  # outputFile   : the output
   def kWayMergeOutputWithFile(self, bufPool, fileIterators, outputFile):
     
     heap    = [];
     schema  = self.subPlan.schema();
-    
     # redefine the function locally
     sortKeyFnTuple = lambda e : self.sortKeyFn(schema.unpack(e));
+    
     # initialize heap
-    for p in file:
-      raise NotImplemented;
+    for (tupleIter, orderId) in fileIterators.keys():
+      tuple = next(tupleIter);
+      heappush(heap, ( sortKeyFnTuple( tuple ), orderId, tuple, tupleIter ) );
+    
+    while( heap != [] ):
+      
+      (value, order, tupleData, g) = heappop(heap);  
+      
     
     
     
