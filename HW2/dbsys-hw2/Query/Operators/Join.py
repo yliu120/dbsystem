@@ -2,6 +2,7 @@ import itertools
 
 from Catalog.Schema import DBSchema
 from Query.Operator import Operator
+from Query.Operators.TableScan import TableScan
 
 class Join(Operator):
   def __init__(self, lhsPlan, rhsPlan, **kwargs):
@@ -163,24 +164,16 @@ class Join(Operator):
   # for its block of the outer relation.
 
   def blockNestedLoops(self):
-    print ('BNLJ called.');
     
-    inputIteratorL = iter(self.lhsPlan);
-    inputIteratorR = iter(self.rhsPlan);
-    
-    for pageBlock in self.accessPageBlock(self.storage.bufferPool, inputIteratorL):
+    for pageBlock in self.accessPageBlock(self.storage.bufferPool, iter(self.lhsPlan)):
       for lPageId in pageBlock:
         lhsPage = self.storage.bufferPool.getPage(lPageId);
         for lTuple in lhsPage:
-          joinExprEnv = self.loadSchema(self.lhsSchema, lTuple);
-          print (joinExprEnv);     
+          joinExprEnv = self.loadSchema(self.lhsSchema, lTuple);    
           
-          print (inputIteratorR);
-          for (rPageId, rhsPage) in inputIteratorR:
-            print ("rPage loop");
+          for (rPageId, rhsPage) in iter(self.rhsPlan):
             for rTuple in rhsPage:
               joinExprEnv.update(self.loadSchema(self.rhsSchema, rTuple));
-              print (joinExprEnv);
               
               if eval(self.joinExpr, globals(), joinExprEnv):
                 outputTuple = self.joinSchema.instantiate(*[joinExprEnv[f] for f in self.joinSchema.fields]);
@@ -198,7 +191,6 @@ class Join(Operator):
   # This method pins pages in the buffer pool during its access.
   # We track the page ids in the block to unpin them after processing the block.
   def accessPageBlock(self, bufPool, pageIterator):
-    print ("accessPageBlock called");
     self.cleanBufferPool( bufPool );
     pageBlock = [];
     self.inputFinished = False;
@@ -265,8 +257,11 @@ class Join(Operator):
       relIdTmpR = relIdTmpL.rstrip('L') + 'R';
       
       if (self.storage.hasRelation(relIdTmpR)):
-        self.lhsPlan = self.storage.pages(relIdTmpL);
-        self.rhsPlan = self.storage.pages(relIdTmpR);
+        self.lhsPlan = TableScan(relIdTmpL, self.inputSchemas()[0]);
+        self.lhsPlan = TableScan(relIdTmpR, self.inputSchemas()[1]);
+        
+        self.lhsPlan.storage = self.storage;
+        self.rhsPlan.storage = self.storage;
         _ = self.blockNestedLoops();
         
         self.storage.removeRelation(relIdTmpL);
