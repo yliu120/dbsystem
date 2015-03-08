@@ -102,11 +102,29 @@ class Sort(Operator):
     # if true then return the output iterator
     # if false then goto pass 1...N
     while( not(self.isOutputReady( passId )) ):
-    # pass 1 ... N
+      # implementing pass 1 ... N
+      while( self.tmpFileMap[ passId ] != [] ):
+        # implementing runs 0 ... M 
+        fileIterators = dict();
+        listIterator  = iter( self.tmpFileMap[ passId ] );
+        # Pull corresponding files to the buffer pool  
+        while( bufPool.numFreePages() > 1 ):
+          try:
+            fileIterator  = self.storage.fileMgr.relationFile( next(listIterator) )[1].pages();
+          except StopIteration:
+            break;
+        
+          firstPageIter = iter( next(fileIterator) ); 
+          fileIterators[ firstPageIter ] = fileIterator;
+        
+        # run k-way merge sort for this run
+        tmpFile = self.getTmpFile( passId + 1, runId );
+        self.kWayMergeOutputWithFile(bufPool, fileIterators, tmpFile);
+        
+        runId += 1;
+        # End run
       passId += 1;
-      runId   = 0;
-      
-    
+      # End pass  
     return self.storage.pages(self.tmpFileMap[passId][0]);  
   # Plan and statistics information
 
@@ -186,6 +204,12 @@ class Sort(Operator):
         pass
     
       outputFile.insertTuple( tupleData );
+  
+  # Here we provide a k-way merge output for pass 1, 2, 3.. N
+  # This function differs from the previous one by including file iterators
+  def kWayMergeOutputWithFile(self, bufPool, fileIterators, outputFile):
+    
+    
       
   def isOutputReady(self, passId):
     return True if len(self.tmpFileMap[passId]) == 1 else False;
