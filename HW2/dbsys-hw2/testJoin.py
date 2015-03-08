@@ -11,10 +11,10 @@ from Query.Operators.Join   import Join
 import random
 
 db = Database.Database()
-db.createRelation('employee', [('id', 'int'), ('age', 'int')])
+db.createRelation('employee', [('id', 'int'), ('age', 'int'), ('description', 'char(40)')])
 schema = db.relationSchema('employee')
 
-for tup in [schema.pack(schema.instantiate(i, random.randint(0,50))) for i in range(0,10)]:
+for tup in [schema.pack(schema.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,10000)]:
   _ = db.insertTuple(schema.name, tup)
 
  ### SELECT * FROM Employee E1 JOIN Employee E2 ON E1.id = E2.id
