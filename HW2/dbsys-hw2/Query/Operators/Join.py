@@ -96,8 +96,7 @@ class Join(Operator):
   # Iterator abstraction for join operator.
   def __iter__(self):
     self.initializeOutput();
-    self.inputIteratorL = iter(self.lhsPlan);
-    self.inputIteratorR = iter(self.rhsPlan);
+    
     self.outputIterator = self.processAllPages();
 
     return self;
@@ -165,26 +164,29 @@ class Join(Operator):
 
   def blockNestedLoops(self):
     print ('BNLJ called.');
-    for pageBlock in self.accessPageBlock(self.storage.bufferPool, self.inputIteratorL):
+    
+    inputIteratorL = iter(self.lhsPlan);
+    inputIteratorR = iter(self.rhsPlan);
+    
+    for pageBlock in self.accessPageBlock(self.storage.bufferPool, inputIteratorL):
       for lPageId in pageBlock:
         lhsPage = self.storage.bufferPool.getPage(lPageId);
         for lTuple in lhsPage:
           joinExprEnv = self.loadSchema(self.lhsSchema, lTuple);
-          #print (joinExprEnv);     
+          print (joinExprEnv);     
           
-          for (rPageId, rhsPage) in self.inputIteratorR:
-              #print ("rPage loop");
+          print (inputIteratorR);
+          for (rPageId, rhsPage) in inputIteratorR:
+            print ("rPage loop");
             for rTuple in rhsPage:
               joinExprEnv.update(self.loadSchema(self.rhsSchema, rTuple));
-                #print (joinExprEnv);
+              print (joinExprEnv);
               
               if eval(self.joinExpr, globals(), joinExprEnv):
                 outputTuple = self.joinSchema.instantiate(*[joinExprEnv[f] for f in self.joinSchema.fields]);
                   #self.emitOutputTuple(self.joinSchema.pack(outputTuple));
                 outputTupleP = self.joinSchema.pack(outputTuple);
                 self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP);
-          
-            #print ("no more inputIteratorR");
             
         
         self.storage.bufferPool.unpinPage(lPageId);
@@ -254,17 +256,17 @@ class Join(Operator):
     self.tmpFilesL = list();
     self.tmpFilesR = list();
     
-    for (PageId, Page) in self.inputIteratorL:
+    for (PageId, Page) in iter(self.lhsPlan):
       self.buildPartitionL(PageId, Page);
-    for (PageId, Page) in self.inputIteratorR:
+    for (PageId, Page) in iter(self.rhsPlan):
       self.buildPartitionR(PageId, Page);
       
     for relIdTmpL in self.tmpFilesL:
       relIdTmpR = relIdTmpL.rstrip('L') + 'R';
       
       if (self.storage.hasRelation(relIdTmpR)):
-        self.inputIteratorL = self.storage.pages(relIdTmpL);
-        self.inputIteratorR = self.storage.pages(relIdTmpR);
+        self.lhsPlan = self.storage.pages(relIdTmpL);
+        self.rhsPlan = self.storage.pages(relIdTmpR);
         _ = self.blockNestedLoops();
         
         self.storage.removeRelation(relIdTmpL);

@@ -14,7 +14,7 @@ db = Database.Database()
 db.createRelation('employee', [('id', 'int'), ('age', 'int')])
 schema = db.relationSchema('employee')
 
-for tup in [schema.pack(schema.instantiate(i, random.randint(0,50))) for i in range(0,20000)]:
+for tup in [schema.pack(schema.instantiate(i, random.randint(0,50))) for i in range(0,10)]:
   _ = db.insertTuple(schema.name, tup)
 
  ### SELECT * FROM Employee E1 JOIN Employee E2 ON E1.id = E2.id
@@ -30,6 +30,6 @@ print(query4.explain())
 q4results = [query4.schema().unpack(tup) for page in db.processQuery(query4) for tup in page[1]]
 
 
-#print([(tup.id, tup.id2) for tup in q4results]);
-#print ([tup for tup in q4results]);
+print([(tup.id, tup.id2) for tup in q4results]);
+print ([tup for tup in q4results]);
 print( len(q4results) );
