@@ -101,11 +101,11 @@ class Sort(Operator):
     # Check ready for output
     # if true then return the output iterator
     # if false then goto pass 1...N
+    # implementing pass 1 ... N
     while( not(self.isOutputReady( passId )) ):
-      # implementing pass 1 ... N
       
       listIterator  = iter( self.tmpFileMap[ passId ] );
-      while( True ):
+      while( listIterator ):
         # implementing runs 0 ... M 
         fileIterators = dict();
         # Pull corresponding files to the buffer pool 
@@ -115,6 +115,7 @@ class Sort(Operator):
           try:
             fileIterator  = self.storage.fileMgr.relationFile( next(listIterator) )[1].pages();
           except StopIteration:
+            del listIterator;
             break;
         
           firstPage     = next( fileIterator );
