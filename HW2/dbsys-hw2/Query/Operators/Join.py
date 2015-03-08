@@ -258,7 +258,7 @@ class Join(Operator):
       
       if (self.storage.hasRelation(relIdTmpR)):
         self.lhsPlan = TableScan(relIdTmpL, self.inputSchemas()[0]);
-        self.lhsPlan = TableScan(relIdTmpR, self.inputSchemas()[1]);
+        self.rhsPlan = TableScan(relIdTmpR, self.inputSchemas()[1]);
         
         self.lhsPlan.storage = self.storage;
         self.rhsPlan.storage = self.storage;
