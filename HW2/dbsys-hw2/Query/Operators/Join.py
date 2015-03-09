@@ -165,24 +165,24 @@ class Join(Operator):
   def blockNestedLoops(self):
     
     for pageBlock in self.accessPageBlock(self.storage.bufferPool, iter(self.lhsPlan)):
-      for lPageId in pageBlock:
-        print("number of Free Page in bufferPool before lPage: " + str(self.storage.bufferPool.numFreePages()));
-        lhsPage = self.storage.bufferPool.getPage(lPageId);
-        print("number of Free Page in bufferPool after lPage: " + str(self.storage.bufferPool.numFreePages()));
-        for lTuple in lhsPage:
-          joinExprEnv = self.loadSchema(self.lhsSchema, lTuple);    
-          print("Enter right page")
-          for (rPageId, rhsPage) in iter(self.rhsPlan):
-            for rTuple in rhsPage:
-              joinExprEnv.update(self.loadSchema(self.rhsSchema, rTuple));
+      for (rPageId, rhsPage) in iter(self.rhsPlan):
+        for rTuple in rhsPage:
+          joinExprEnv = self.loadSchema(self.rhsSchema, rTuple);
+      
+          for lPageId in pageBlock:
+            lhsPage = self.storage.bufferPool.getPage(lPageId);
+            for lTuple in lhsPage:
+          
+              joinExprEnv.update(self.loadSchema(self.lhsSchema, lTuple));
+              
               if eval(self.joinExpr, globals(), joinExprEnv):
                 outputTuple = self.joinSchema.instantiate(*[joinExprEnv[f] for f in self.joinSchema.fields]);
-                  #self.emitOutputTuple(self.joinSchema.pack(outputTuple));
+                #self.emitOutputTuple(self.joinSchema.pack(outputTuple));
                 outputTupleP = self.joinSchema.pack(outputTuple);
                 self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP); 
         
-        self.storage.bufferPool.unpinPage(lPageId);
-        self.storage.bufferPool.discardPage(lPageId);
+            self.storage.bufferPool.unpinPage(lPageId);
+            self.storage.bufferPool.discardPage(lPageId);
     
     return self.storage.pages(self.relationId());
 
@@ -191,7 +191,6 @@ class Join(Operator):
   # We track the page ids in the block to unpin them after processing the block.
   def accessPageBlock(self, bufPool, pageIterator):
       
-    timer1 = time();
     self.cleanBufferPool( bufPool );
     pageBlock = [];
     self.inputFinished = False;
@@ -205,13 +204,9 @@ class Join(Operator):
         else:
           yield pageBlock;
           pageBlock = [];
-          timer2 = time();
       except StopIteration:
         self.inputFinished = True;
         yield pageBlock;
-    
-    timer3 = time();
-    print("accessPageBlock: " + str(timer3 - timer1));
       
 
 
