@@ -181,8 +181,9 @@ class Join(Operator):
                 outputTupleP = self.joinSchema.pack(outputTuple);
                 self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP); 
         
-            self.storage.bufferPool.unpinPage(lPageId);
-            self.storage.bufferPool.discardPage(lPageId);
+      for lPageId in pageBlock:
+        self.storage.bufferPool.unpinPage(lPageId);
+        self.storage.bufferPool.discardPage(lPageId);
     
     return self.storage.pages(self.relationId());
 
@@ -241,9 +242,14 @@ class Join(Operator):
   #
   def hashJoin(self):
     if self.joinExpr == None:
-      self.joinExpr = self.lhsKeySchema.fields[0] + "==" + self.rhsKeySchema.fields[0];
-      # what if KeySchema includes multiple fields?
-      # what if joinExpr is a range comparison?
+      self.joinExpr = "(" + self.lhsKeySchema.fields[0] + "==" + self.rhsKeySchema.fields[0] + ")";
+      if len(self.lhsKeySchema.fields) > 1:
+        for i in range(1, len(self.lhsKeySchema.fields)):
+          self.joinExpr += " and " + "(" + self.lhsKeySchema.fields[i] + "==" + self.rhsKeySchema.fields[i] + ")";
+      
+    else:
+      for i in range(0, len(self.lhsKeySchema.fields)):
+        self.joinExpr += " and " + "(" + self.lhsKeySchema.fields[i] + "==" + self.rhsKeySchema.fields[i] + ")";
     
     self.tmpFilesL = list();
     self.tmpFilesR = list();
