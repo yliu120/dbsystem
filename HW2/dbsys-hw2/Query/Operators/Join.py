@@ -164,6 +164,7 @@ class Join(Operator):
 
   def blockNestedLoops(self):
     
+    self.logger("starting...")
     for pageBlock in self.accessPageBlock(self.storage.bufferPool, iter(self.lhsPlan)):
       for (rPageId, rhsPage) in iter(self.rhsPlan):
         for rTuple in rhsPage:
@@ -254,6 +255,7 @@ class Join(Operator):
     self.tmpFilesL = list();
     self.tmpFilesR = list();
     
+    self.logger("start...");
     for (PageId, Page) in iter(self.lhsPlan):
       self.buildPartitionL(PageId, Page);
     for (PageId, Page) in iter(self.rhsPlan):

@@ -81,11 +81,13 @@ class Project(Operator):
 
   # Set-at-a-time operator processing
   def processAllPages(self):
+
     if self.inputIterator is None:
       self.inputIterator = iter(self.subPlan)
 
     # Process all pages from the child operator.
     try:
+      self.logger("start...");
       for (pageId, page) in self.inputIterator:
         self.processInputPage(pageId, page)
 

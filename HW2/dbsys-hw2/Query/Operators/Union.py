@@ -102,7 +102,8 @@ class Union(Operator):
         # No need to track anything but the last output page when in batch mode.
         if self.outputPages:
           self.outputPages = [self.outputPages[-1]];
-          
+      
+      self.logger("start..");
       for (pageId, page) in self.inputIteratorR:
         self.processInputPageR(pageId, page);
 

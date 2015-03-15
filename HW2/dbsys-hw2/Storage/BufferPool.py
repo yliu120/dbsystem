@@ -25,7 +25,7 @@ class BufferPool:
 
   """
 
-  defaultPoolSize = 1 * (1 << 20)
+  defaultPoolSize = 128 * (1 << 20)
 
   def __init__(self, **kwargs):
     other = kwargs.get("other", None)
@@ -89,7 +89,6 @@ class BufferPool:
 
       else:
         # Fetch the page from the file system, adding it to the buffer pool
-        print("Fetching page from the file system");
         if not self.freeList:
           self.evictPage()
 

@@ -17,7 +17,7 @@ class GroupBy(Operator):
           groupHashFn=(lambda gbVal: hash(gbVal[0]) % 2) \
           ).finalize()
   '''
-  memoryLimit = 1 << 20; # 1GB   
+  memoryLimit = 128 * (1 << 20); # 1GB   
     
   def __init__(self, subPlan, **kwargs):
     super().__init__(**kwargs)
@@ -138,6 +138,7 @@ class GroupBy(Operator):
 
     # Process all pages from the child operator.
     try:
+      self.logger("start...");
       for (pageId, page) in self.inputIterator:
         self.processInputPage(pageId, page)
 

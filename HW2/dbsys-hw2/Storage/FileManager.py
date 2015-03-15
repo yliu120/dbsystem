@@ -72,7 +72,7 @@ class FileManager:
         self.fileCounter   = kwargs.get("fileCounter", 0)
         self.relationFiles = kwargs.get("relationFiles", {})
         self.fileMap       = kwargs.get("fileMap", {})
-        self.indexManager  = kwargs.get("indexManager", IndexManager(indexDir=self.indexDir))
+        # self.indexManager  = kwargs.get("indexManager", IndexManager(indexDir=self.indexDir))
         
         if restoring:
           self.relationFiles = dict([(i[0], FileId(i[1])) for i in kwargs["restore"][0]])
@@ -155,9 +155,9 @@ class FileManager:
   def removeRelation(self, relId, detach=False):
     fId   = self.relationFiles.pop(relId, None)
     rFile = self.fileMap.pop(fId, None) if fId else None
-    if rFile and self.indexManager:
-      for (_, _, indexId) in self.indexManager.indexes(relId):
-        self.indexManager.removeIndex(relId, indexId, detach)
+    if rFile: #and self.indexManager:
+      #for (_, _, indexId) in self.indexManager.indexes(relId):
+        #self.indexManager.removeIndex(relId, indexId, detach)
 
       if not detach:
         rFile.close()

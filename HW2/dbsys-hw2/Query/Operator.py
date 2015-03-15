@@ -125,6 +125,9 @@ class Operator:
   def explain(self):
     return self.operatorType() + "[" + str(self.id()) + ",cost={:.2f}".format(self.cost()) + "]"
 
+  def logger(self, comment):
+    print("logger: processing " + self.explain() + " " + comment);
+
   def cost(self):
     raise NotImplementedError
 
