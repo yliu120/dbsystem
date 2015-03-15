@@ -94,7 +94,7 @@ class FileManager:
     self.relationFiles   = other.relationFiles
     self.fileMap         = other.fileMap
     self.indexDir        = other.indexDir
-    self.indexManager    = other.indexManager
+   # self.indexManager    = other.indexManager
 
   # Closes and flushes all storage files in the file manager.
   # This includes flushing all pages held in the buffer pool.
