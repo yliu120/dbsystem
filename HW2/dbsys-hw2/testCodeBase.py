@@ -188,11 +188,11 @@ query3hash = db.query().fromTable('nation').join(\
              method='hash', \
              lhsHashFn='hash(N_NATIONKEY) % 10', lhsKeySchema=DBSchema('ls1',[('N_NATIONKEY','int')]), \
              rhsHashFn='hash(C_NATIONKEY) % 10', rhsKeySchema=DBSchema('rs1',[('C_NATIONKEY','int')])).join( \
-               db.query().fromTable('orders'), \
+               db.query().fromTable('orders').select({'O_ORDERKEY':('O_ORDERKEY','int'), 'O_CUSTKEY': ('O_CUSTEY', 'int')}), \
                  method='hash', \
                  lhsHashFn='hash(C_CUSTKEY) % 10', lhsKeySchema=DBSchema('ls2',[('C_CUSTKEY','int')]), \
                  rhsHashFn='hash(O_CUSTKEY) % 10', rhsKeySchema=DBSchema('rs2',[('O_CUSTKEY','int')])).join( \
-                   db.query().fromTable('lineitem').select({'L_ORDERKEY':'int', 'L_PARTKEY':'int', 'L_QUANTITY':'float'}), \
+                   db.query().fromTable('lineitem').select({'L_ORDERKEY' : ('L_ORDERKEY', 'int'), 'L_PARTKEY':('L_PARTKEY', 'int'), 'L_QUANTITY': ('L_QUANTITY', 'float')}), \
                      method='hash', \
                      lhsHashFn='hash(O_ORDERKEY) % 10', lhsKeySchema=DBSchema('ls3',[('O_ORDERKEY','int')]), \
                      rhsHashFn='hash(L_ORDERKEY) % 10', rhsKeySchema=DBSchema('rs3',[('L_ORDERKEY','int')])).join( \
