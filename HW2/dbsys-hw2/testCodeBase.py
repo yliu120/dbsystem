@@ -145,7 +145,7 @@ lSchema = DBSchema('liselect',[('L_PARTKEY', 'int')]);
 keySchema = DBSchema('groupByKey', [('p_name', 'char(55)')]);
 groupBySchema = DBSchema('groupBy', [('count','int')]);
 
-query22 = db.query().fromTable('part').select({'p_name': ('P_NAME', 'char(55)'), 'p_partkey': ('P_PARTKEY', 'int')}).join( \
+query2hash = db.query().fromTable('part').select({'p_name': ('P_NAME', 'char(55)'), 'p_partkey': ('P_PARTKEY', 'int')}).join( \
         db.query().fromTable('lineitem').where("L_RETURNFLAG == 'R'"), \
         method='hash', \
         lhsHashFn='hash(p_partkey) % 10',  lhsKeySchema=ls1, \
@@ -160,7 +160,7 @@ start = time();
 for line in readResult(query22):
   print(line);
 end = time();
-print("Time for query22: " + str(end-start));
+print("Time for query2hash: " + str(end-start));
 '''
 '''
 SQL Query. Question 3:
@@ -192,13 +192,7 @@ query3hash = db.query().fromTable('nation').join(\
                  method='hash', \
                  lhsHashFn='hash(C_CUSTKEY) % 10', lhsKeySchema=DBSchema('ls2',[('C_CUSTKEY','int')]), \
                  rhsHashFn='hash(O_CUSTKEY) % 10', rhsKeySchema=DBSchema('rs2',[('O_CUSTKEY','int')])).join( \
-                   db.query().fromTable('lineitem').groupBy( \
-                     groupSchema=DBSchema('gb1',[('L_ORDERKEY','int'), ('L_PARTKEY','int')]), \
-                     aggSchema=DBSchema('agg1',[('num','float')]), \
-                     groupExpr=(lambda e: (e.L_ORDERKEY, e.L_PARTKEY) ), \
-                     aggExprs=[(0, lambda acc, e: acc + e.L_QUANTITY, lambda x: x)], \
-                     groupHashFn=(lambda gbVal: hash(gbVal) % 20)
-                     ), \
+                   db.query().fromTable('lineitem'), \
                      method='hash', \
                      lhsHashFn='hash(O_ORDERKEY) % 10', lhsKeySchema=DBSchema('ls3',[('O_ORDERKEY','int')]), \
                      rhsHashFn='hash(L_ORDERKEY) % 10', rhsKeySchema=DBSchema('rs3',[('L_ORDERKEY','int')])).join( \
@@ -206,6 +200,12 @@ query3hash = db.query().fromTable('nation').join(\
                        method='hash', \
                        lhsHashFn='hash(L_PARTKEY) % 10', lhsKeySchema=DBSchema('ls4',[('L_PARTKEY','int')]), \
                        rhsHashFn='hash(p_partkey) % 10', rhsKeySchema=DBSchema('rs4',[('p_partkey','int')])).groupBy( \
+                        groupSchema=DBSchema('gb1',[('N_NAME','char(25)')]), \
+                        aggSchema=DBSchema('agg1',[('num','float')]), \
+                        groupExpr=(lambda e: e.N_NAME ), \
+                        aggExprs=[(0, lambda acc, e: acc + e.L_QUANTITY, lambda x: x)], \
+                        groupHashFn=(lambda gbVal: hash(gbVal) % 20)
+                     ).groupBy( \
                          groupSchema=DBSchema('gb2',[('N_NAME','char(25)')]), \
                          aggSchema=DBSchema('agg1',[('max','float')]), \
                          groupExpr=(lambda e: e.N_NAME ), \
