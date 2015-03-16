@@ -254,6 +254,8 @@ class Join(Operator):
     bufPool        = self.storage.bufferPool;
     
     self.logger("start...");
+    self.cleanBufferPool(bufPool);
+    
     for (PageId, Page) in iter(self.lhsPlan):
       self.buildPartitionL(PageId, Page);
     for (PageId, Page) in iter(self.rhsPlan):
