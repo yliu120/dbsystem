@@ -188,7 +188,7 @@ query3hash = db.query().fromTable('nation').join(\
              method='hash', \
              lhsHashFn='hash(N_NATIONKEY) % 10', lhsKeySchema=DBSchema('ls1',[('N_NATIONKEY','int')]), \
              rhsHashFn='hash(C_NATIONKEY) % 10', rhsKeySchema=DBSchema('rs1',[('C_NATIONKEY','int')])).join( \
-               db.query().fromTable('orders').select({'O_ORDERKEY' : 'int', 'O_CUSTKEY' : 'int'}), \
+               db.query().fromTable('orders'), \
                  method='hash', \
                  lhsHashFn='hash(C_CUSTKEY) % 10', lhsKeySchema=DBSchema('ls2',[('C_CUSTKEY','int')]), \
                  rhsHashFn='hash(O_CUSTKEY) % 10', rhsKeySchema=DBSchema('rs2',[('O_CUSTKEY','int')])).join( \
