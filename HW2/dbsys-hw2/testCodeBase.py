@@ -205,14 +205,14 @@ query3hash = db.query().fromTable('nation').join(\
                        db.query().fromTable('part').select({'p_name': ('P_NAME', 'char(55)'), 'p_partkey': ('P_PARTKEY', 'int')}), \
                        method='hash', \
                        lhsHashFn='hash(L_PARTKEY) % 10', lhsKeySchema=DBSchema('ls4',[('L_PARTKEY','int')]), \
-                       rhsHashFn='hash(P_PARTKEY) % 10', rhsKeySchema=DBSchema('rs4',[('P_PARTKEY','int')])).groupBy( \
+                       rhsHashFn='hash(p_partkey) % 10', rhsKeySchema=DBSchema('rs4',[('p_partkey','int')])).groupBy( \
                          groupSchema=DBSchema('gb2',[('N_NAME','char(25)')]), \
                          aggSchema=DBSchema('agg1',[('max','float')]), \
                          groupExpr=(lambda e: e.N_NAME ), \
                          aggExprs=[(0, lambda acc, e: max(acc, e.num), lambda x: x)], \
                          groupHashFn=(lambda gbVal: hash(gbVal) % 10) ).finalize();
 
-query3hash.explain();
+print(query3hash.explain());
 
 start = time();
 for line in readResult(query3hash):
