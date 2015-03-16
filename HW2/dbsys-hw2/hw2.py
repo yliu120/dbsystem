@@ -30,7 +30,7 @@ SQL Query. Question 2:
    from part, lineitem
    where part.partkey = lineitem.partkey and lineitem.returnflag = 'R'
    group by part.name;
-'''
+
 # Query with our codebase with BNLJ
 pSchema = db.relationSchema('part');
 lSchema = DBSchema('liselect',[('l_partkey', 'int')]);
@@ -74,7 +74,7 @@ for line in readResult(query22):
   print(line);
 end = time();
 print("Time for query 22: " + str(end-start));
-
+'''
 '''
 SQL Query. Question 3:
   create table temp as
