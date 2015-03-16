@@ -86,9 +86,7 @@ class GroupBy(Operator):
     self.inputIterator = iter(self.subPlan);
     self.inputFinished = False;
     
-    self.outputIterator = self.processAllPages();
-    
-    return self
+    return self.processAllPages();
 
   def __next__(self):  
     return next(self.outputIterator);
@@ -166,7 +164,7 @@ class GroupBy(Operator):
             gc.collect();
           # clean up all the tmp File
           self.storage.removeRelation(k);
-          
+      self.logger("end...");   
     
     # To support pipelined operation, processInputPage may raise a
     # StopIteration exception during its work. We catch this and ignore in batch mode.
@@ -236,7 +234,7 @@ class GroupBy(Operator):
     
       # processing v with final expr:
       tmpSt = v;
-      v = [ self.aggExprs[i][2](tmpSt[i]) for i in range(0, sizeOfAgg)]
+      v = [ self.aggExprs[i][2](tmpSt[i]) for i in range(0, sizeOfAgg) ]
       output.extend(v);
       outputTuple = outputSchema.pack( output );
       self.emitOutputTuple(outputTuple);

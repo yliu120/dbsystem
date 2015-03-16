@@ -33,10 +33,10 @@ class TableScan(Operator):
 
   # Volcano-style iterator abstraction
   def __iter__(self):
-    self.pageIterator = self.storage.pages(self.relId)
+    self.logger("starting scanning");
     self.nextPageId = None
     self.nextPage   = None
-    return self
+    return self.storage.pages(self.relId);
 
   # Table scans are always pipelined.
   # While this implementation is more verbose than necessary, it conveys

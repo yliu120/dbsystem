@@ -44,7 +44,7 @@ class Project(Operator):
     self.inputFinished = False
 
     if not self.pipelined:
-      self.outputIterator = self.processAllPages()
+      return self.processAllPages();
 
     return self
 
@@ -94,7 +94,7 @@ class Project(Operator):
         # No need to track anything but the last output page when in batch mode.
         if self.outputPages:
           self.outputPages = [self.outputPages[-1]]
-
+      self.logger("end...");
     # To support pipelined operation, processInputPage may raise a
     # StopIteration exception during its work. We catch this and ignore in batch mode.
     except StopIteration:

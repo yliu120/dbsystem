@@ -3,7 +3,7 @@ import itertools
 from Catalog.Schema import DBSchema
 from Query.Operator import Operator
 from Query.Operators.TableScan import TableScan
-from time import time
+import gc
 
 class Join(Operator):
   def __init__(self, lhsPlan, rhsPlan, **kwargs):
@@ -98,8 +98,7 @@ class Join(Operator):
   # Iterator abstraction for join operator.
   def __iter__(self):
     self.initializeOutput();
-    self.outputIterator = self.processAllPages();
-    return self;
+    return self.processAllPages();
 
   def __next__(self):
     return next(self.outputIterator);
@@ -185,7 +184,7 @@ class Join(Operator):
       for lPageId in pageBlock:
         self.storage.bufferPool.unpinPage(lPageId);
         self.storage.bufferPool.discardPage(lPageId);
-    
+      self.logger("ending...");
     return self.storage.pages(self.relationId());
 
   # Accesses a block of pages from an iterator.
@@ -210,8 +209,6 @@ class Join(Operator):
         self.inputFinished = True;
         yield pageBlock;
       
-
-
   ##################################
   #
   # Indexed nested loops implementation
@@ -254,6 +251,7 @@ class Join(Operator):
     
     self.tmpFilesL = list();
     self.tmpFilesR = list();
+    bufPool        = self.storage.bufferPool;
     
     self.logger("start...");
     for (PageId, Page) in iter(self.lhsPlan):
@@ -261,17 +259,58 @@ class Join(Operator):
     for (PageId, Page) in iter(self.rhsPlan):
       self.buildPartitionR(PageId, Page);
       
+    # Schema prep
+    lSchema = self.inputSchemas()[0];
+    rSchema = self.inputSchemas()[1];
+      
     for relIdTmpL in self.tmpFilesL:
+       
+      # Clean up before running.  
+      self.cleanBufferPool( bufPool );
       relIdTmpR = relIdTmpL.rstrip('L') + 'R';
       
       if (self.storage.hasRelation(relIdTmpR)):
-        self.lhsPlan = TableScan(relIdTmpL, self.inputSchemas()[0]);
-        self.rhsPlan = TableScan(relIdTmpR, self.inputSchemas()[1]);
+        lhsPlan = TableScan(relIdTmpL, self.inputSchemas()[0]);
+        rhsPlan = TableScan(relIdTmpR, self.inputSchemas()[1]);
         
-        self.lhsPlan.storage = self.storage;
-        self.rhsPlan.storage = self.storage;
-        _ = self.blockNestedLoops();
+        lhsPlan.storage = self.storage;
+        rhsPlan.storage = self.storage;
         
+        # Filling in-memory hash table
+        for pageBlock in self.accessPageBlock( bufPool, iter(lhsPlan) ):
+            
+          # Building a in-memory hash table
+          hasher = dict();
+      
+          for lPageId in pageBlock:
+            lhsPage = bufPool.getPage(lPageId);
+            for ltuple in lhsPage:
+              tupleObj = lSchema.unpack( ltuple );
+              key      = lSchema.project( tupleObj, self.lhsKeySchema )[0];
+              if key in hasher:
+                hasher[ key ].append( ltuple );
+              else:
+                hasher[ key ] = [ ltuple ];
+
+          # iterating all rtuples to pack output
+          for (rPageId, rhsPage) in iter(rhsPlan):
+            for rTuple in rhsPage:
+              tupleObj = rSchema.unpack( rTuple );
+              key      = rSchema.project( tupleObj, self.rhsKeySchema )[0];
+              if key in hasher:
+                for lTuple in hasher[ key ]:
+                  joinIns = self.loadSchema( lSchema, lTuple )
+                  joinIns.update( self.loadSchema( rSchema, rTuple ) );
+                  outputTuple = self.joinSchema.instantiate(*[joinIns[f] for f in self.joinSchema.fields]);
+                  outputTupleP = self.joinSchema.pack(outputTuple);
+                  self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP);
+                  
+          for lPageId in pageBlock:
+            bufPool.unpinPage(lPageId);
+            bufPool.discardPage(lPageId);
+        
+          del hasher;
+          gc.collect();
         self.storage.removeRelation(relIdTmpL);
         self.storage.removeRelation(relIdTmpR);
     

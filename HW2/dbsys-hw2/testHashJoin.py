@@ -11,23 +11,23 @@ from Query.Operators.Join   import Join
 import random
 
 
-db = Database.Database()
-db.createRelation('employee', [('id', 'int'), ('age', 'int'), ('desc', 'char(40)')])
-db.createRelation('employee2', [('id2', 'int'), ('age2', 'int'), ('desc2', 'char(40)')])
-schema1 = db.relationSchema('employee')
-schema2 = db.relationSchema('employee2')
+db = Database.Database(dataDir="data2")
+db.createRelation('employeeeee', [('id', 'int'), ('age', 'int'), ('desc', 'char(40)')])
+db.createRelation('employeeeee2', [('id2', 'int'), ('age2', 'int'), ('desc2', 'char(40)')])
+schema1 = db.relationSchema('employeeeee')
+schema2 = db.relationSchema('employeeeee2')
 
-for tup in [schema1.pack(schema1.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,2000)]:
+for tup in [schema1.pack(schema1.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,20000)]:
   _ = db.insertTuple(schema1.name, tup)
 
-for tup in [schema2.pack(schema2.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,2000)]:
+for tup in [schema2.pack(schema2.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,20000)]:
   _ = db.insertTuple(schema2.name, tup)
 
-keySchema  = DBSchema('employeeKey',  [('id', 'int'), ('age', 'int')])
-keySchema2 = DBSchema('employeeKey2', [('id2', 'int'), ('age2', 'int')])
+keySchema  = DBSchema('employeeKey',  [('id', 'int')])
+keySchema2 = DBSchema('employeeKey2', [('id2', 'int')])
   
-query5 = db.query().fromTable('employee').join( \
-          db.query().fromTable('employee'), \
+query5 = db.query().fromTable('employeeeee').join( \
+          db.query().fromTable('employeeeee2'), \
           rhsSchema=schema2, \
           method='hash', \
           lhsHashFn='hash(id) % 4',  lhsKeySchema=keySchema, \
