@@ -104,7 +104,14 @@ keySchema32 = DBSchema('groupByKey1', [('N_NAME', 'char(25)'),('p_name', 'char(5
 aggSchema32 = DBSchema('groupByagg1', [('num', 'int')]);
 
 query31 = db.query().fromTable('nation').join(\
-           db.query().fromTable('customer').select({'c_nationkey': ('C_NATIONKEY', 'int'), 'c_custkey': ('C_CUSTKEY','int')}).join( \
+           db.query().fromTable('customer'), \
+             method='block-nested-loops', expr="c_nationkey == N_NATIONKEY").join(\
+               db.query().fromTable('orders')),
+                 method='block-nested-loops', expr="c_custkey == o_custkey").finalize();
+           
+           
+           
+           .join( \
              db.query().fromTable('orders').select({'o_custkey': ('O_CUSTKEY','int'), 'o_orderkey' : ('O_ORDERKEY', 'int')}).join( \
                db.query().fromTable('lineitem').groupBy(
                  groupSchema=keySchema31, \
