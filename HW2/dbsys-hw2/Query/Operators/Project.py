@@ -60,7 +60,7 @@ class Project(Operator):
       return self.outputPage()
 
     else:
-      return next(self.outputIterator)
+      return next(self.storage.pages(self.relationId()))
 
 
   # Page-at-a-time operator processing

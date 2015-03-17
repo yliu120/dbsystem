@@ -230,9 +230,10 @@ query3hash = allgroup1.groupBy(\
 
 
 start = time();
-for line in readResult(db.query().fromTable('customer').finalize()):
+for line in readResult(nco.finalize()):
   print(line);
 end = time();
 print("Time for query3hash: " + str(end-start));           
-                 
+
+db.close();             
                  

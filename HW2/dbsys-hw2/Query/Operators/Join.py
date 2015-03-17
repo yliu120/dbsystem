@@ -101,7 +101,7 @@ class Join(Operator):
     return self.processAllPages();
 
   def __next__(self):
-    return next(self.outputIterator);
+    return next(self.storage.pages(self.relationId()));
 
   # Page-at-a-time operator processing
   def processInputPage(self, pageId, page):
@@ -166,12 +166,12 @@ class Join(Operator):
     self.logger("starting...")
     for pageBlock in self.accessPageBlock(self.storage.bufferPool, iter(self.lhsPlan)):
       for (rPageId, rhsPage) in iter(self.rhsPlan):
-        for rTuple in rhsPage:
+        for rTuple in iter(rhsPage):
           joinExprEnv = self.loadSchema(self.rhsSchema, rTuple);
       
           for lPageId in pageBlock:
             lhsPage = self.storage.bufferPool.getPage(lPageId);
-            for lTuple in lhsPage:
+            for lTuple in iter(lhsPage):
           
               joinExprEnv.update(self.loadSchema(self.lhsSchema, lTuple));
               
@@ -287,16 +287,17 @@ class Join(Operator):
         
       lhsPlan.storage = self.storage;
       rhsPlan.storage = self.storage;
+      
         
       # Filling in-memory hash table
       for pageBlock in self.accessPageBlock( bufPool, iter(lhsPlan) ):
-            
+          
           # Building a in-memory hash table
           hasher = dict();
       
           for lPageId in pageBlock:
             lhsPage = bufPool.getPage(lPageId);
-            for ltuple in lhsPage:
+            for ltuple in iter( lhsPage ):
               tupleObj = lSchema.unpack( ltuple );
               key      = lSchema.project( tupleObj, self.lhsKeySchema )[0];
               if key in hasher:
@@ -306,15 +307,17 @@ class Join(Operator):
 
           # iterating all rtuples to pack output
           for (rPageId, rhsPage) in iter(rhsPlan):
-            for rTuple in rhsPage:
+            # print( rPageId.pageIndex );
+            for rTuple in iter( rhsPage ):
               tupleObj = rSchema.unpack( rTuple );
+              # print( tupleObj );
               key      = rSchema.project( tupleObj, self.rhsKeySchema )[0];
               if key in hasher:
                 for lTuple in hasher[ key ]:
                   joinIns = self.loadSchema( lSchema, lTuple )
-                  print( joinIns );
                   joinIns.update( self.loadSchema( rSchema, rTuple ) );
                   outputTuple = self.joinSchema.instantiate(*[joinIns[f] for f in self.joinSchema.fields]);
+                  # print( outputTuple );
                   outputTupleP = self.joinSchema.pack(outputTuple);
                   self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP);
                   

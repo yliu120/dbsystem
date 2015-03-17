@@ -42,11 +42,11 @@ class TableScan(Operator):
   # While this implementation is more verbose than necessary, it conveys
   # the page-oriented processing style of all operators.
   def __next__(self):
-    while not(self.isOutputPageReady()):
+    # while not(self.isOutputPageReady()):
       # Table scans in the storage engine return a pair of pageId and page
-      pageId, page = next(self.pageIterator)
-      self.processInputPage(pageId, page)
-    return self.outputPage()
+      # pageId, page = next(self.pageIterator)
+      # self.processInputPage(pageId, page)
+    return next(self.storage.pages(self.relId));
 
   # Returns whether this operator has an output page ready for its iterator.
   def isOutputPageReady(self):
