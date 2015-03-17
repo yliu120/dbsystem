@@ -25,7 +25,7 @@ SQL Query. Question 1:
 '''
 
 #Query 1 -- hash join:
-'''
+
 lhsKeySchema1 = DBSchema('partsupp', [('PS_PARTKEY', 'int')])
 rhsKeySchema1 = DBSchema('part', [('P_PARTKEY','int')])
 
@@ -77,7 +77,7 @@ for line in readResult(query1hash):
   print(line);
 end = time()
 print("Execution time: " + str(end - start))
-'''
+
 '''
 SQL Query. Question 2:
   select part.name, count(*) as count
@@ -85,53 +85,10 @@ SQL Query. Question 2:
    where part.partkey = lineitem.partkey and lineitem.returnflag = 'R'
    group by part.name;
 
-# Query with our codebase with BNLJ
-pSchema = db.relationSchema('part');
-lSchema = DBSchema('liselect',[('l_partkey', 'int')]);
-keySchema = DBSchema('groupByKey', [('p_name', 'char(55)')]);
-groupBySchema = DBSchema('groupBy', [('count','int')]);
 
-query21 = db.query().fromTable('part').select({'p_name': ('P_NAME', 'char(55)'), 'p_partkey': ('P_PARTKEY', 'int')}).join( \
-        db.query().fromTable('lineitem').where("L_RETURNFLAG == 'R'").select({'l_partkey': ('L_PARTKEY', 'int')}), \
-        rhsSchema=lSchema, \
-        method='block-nested-loops', expr="p_partkey == l_partkey").groupBy( \
-        groupSchema=keySchema, \
-          aggSchema=groupBySchema, \
-          groupExpr=(lambda e: e.p_name), \
-          aggExprs=[(0, lambda acc, e: acc + 1, lambda x: x)], \
-          groupHashFn=(lambda gbVal: gbVal % 10)).finalize();
-
-start = time();
-for line in readResult(query21):
-  print(line);
-end = time();
-print("Time for query 21: " + str(end-start));
-# Query with our codebase with HashJoin
-
-ls1 = DBSchema('partkey1',[('p_partkey', 'int')]);
-rs1 = DBSchema('partkey2',[('l_partkey', 'int')]);
-
-query22 = db.query().fromTable('part').select({'p_name': ('P_NAME', 'char(55)'), 'p_partkey': ('P_PARTKEY', 'int')}).join( \
-        db.query().fromTable('lineitem').where("L_RETURNFLAG == 'R'").select({'l_partkey': ('L_PARTKEY', 'int')}), \
-        rhsSchema=lSchema, \
-        method='hash', \
-        lhsHashFn='hash(partkey) % 10',  lhsKeySchema=ls1, \
-        rhsHashFn='hash(lkey) % 10', rhsKeySchema=rs1,).groupBy( \
-        groupSchema=keySchema, \
-          aggSchema=groupBySchema, \
-          groupExpr=(lambda e: e.p_name), \
-          aggExprs=[(0, lambda acc, e: acc + 1, lambda x: x)], \
-          groupHashFn=(lambda gbVal: gbVal % 10)).finalize();
-          
-start = time();
-for line in readResult(query22):
-  print(line);
-end = time();
-print("Time for query 22: " + str(end-start));
 '''
 
 # 
-'''
 ls1 = DBSchema('partkey1',[('p_partkey', 'int')]);
 rs1 = DBSchema('partkey2',[('L_PARTKEY', 'int')]);
 
@@ -156,7 +113,7 @@ for line in readResult(query22):
   print(line);
 end = time();
 print("Time for query2hash: " + str(end-start));
-'''
+
 '''
 SQL Query. Question 3:
   create table temp as
@@ -230,7 +187,7 @@ query3hash = allgroup1.groupBy(\
 
 
 start = time();
-for line in readResult(db.query().fromTable('customer').finalize()):
+for line in readResult(query3hash):
   print(line);
 end = time();
 print("Time for query3hash: " + str(end-start));           
