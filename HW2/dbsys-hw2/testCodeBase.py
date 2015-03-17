@@ -189,29 +189,28 @@ nc = nation.join(\
        customer, \
        rhsSchema = DBSchema('c',[('C_NATIONKEY','int'),('C_CUSTKEY','int')]), \
        method = 'hash', \
-       lhsHashFn='hash(N_NATIONKEY) % 5', lhsKeySchema=DBSchema('ls1',[('N_NATIONKEY','int')]), \
-       rhsHashFn='hash(C_NATIONKEY) % 5', rhsKeySchema=DBSchema('rs1',[('C_NATIONKEY','int')]))
+       lhsHashFn=lambda e : e.N_NATIONKEY % 5, lhsKeySchema=DBSchema('ls1',[('N_NATIONKEY','int')]), \
+       rhsHashFn=lambda e : e.C_NATIONKEY % 5, rhsKeySchema=DBSchema('rs1',[('C_NATIONKEY','int')]))
 
 nco = nc.join(\
        orders, \
-       rhsSchema = DBSchema('o',[('O_ORDERKEY','int'), ('O_CUSTKEY','int')]), \
        method = 'hash', \
-       lhsHashFn='hash(C_CUSTKEY) % 5', lhsKeySchema=DBSchema('ls2',[('C_CUSTKEY','int')]), \
-       rhsHashFn='hash(O_CUSTKEY) % 5', rhsKeySchema=DBSchema('rs2',[('O_CUSTKEY','int')]))
+       lhsHashFn=lambda e : e.C_CUSTKEY % 5, lhsKeySchema=DBSchema('ls2',[('C_CUSTKEY','int')]), \
+       rhsHashFn=lambda e : e.O_CUSTKEY % 5, rhsKeySchema=DBSchema('rs2',[('O_CUSTKEY','int')]))
 
 ncol = nco.join(\
         line, \
         rhsSchema = DBSchema('l',[('L_ORDERKEY','int'),('L_PARTKEY','int'),('L_QUANTITY','float')]), \
         method = 'hash', \
-        lhsHashFn='hash(O_ORDERKEY) % 5', lhsKeySchema=DBSchema('ls3',[('O_ORDERKEY','int')]), \
-        rhsHashFn='hash(L_ORDERKEY) % 5', rhsKeySchema=DBSchema('rs3',[('L_ORDERKEY','int')]))
+        lhsHashFn=lambda e : e.O_ORDERKEY % 5, lhsKeySchema=DBSchema('ls3',[('O_ORDERKEY','int')]), \
+        rhsHashFn=lambda e : e.L_ORDERKEY % 5, rhsKeySchema=DBSchema('rs3',[('L_ORDERKEY','int')]))
 
 all  = ncol.join(\
         part, \
         rhsSchema = DBSchema('p', [('P_PARTKEY','int'),('P_NAME','char(55)')]),\
         method = 'hash', \
-        lhsHashFn='hash(L_PARTKEY) % 5', lhsKeySchema=DBSchema('ls4',[('L_PARTKEY','int')]), \
-        rhsHashFn='hash(P_PARTKEY) % 5', rhsKeySchema=DBSchema('rs4',[('P_PARTKEY','int')])
+        lhsHashFn=lambda e : e.L_PARTKEY % 5, lhsKeySchema=DBSchema('ls4',[('L_PARTKEY','int')]), \
+        rhsHashFn=lambda e : e.P_PARTKEY % 5, rhsKeySchema=DBSchema('rs4',[('P_PARTKEY','int')])
         )
 
 allgroup1 = all.groupBy(\
@@ -229,10 +228,9 @@ query3hash = allgroup1.groupBy(\
               aggExprs=[(0, lambda acc, e: max(acc, e.num), lambda x: x)], \
               groupHashFn=(lambda gbVal: hash(gbVal) % 10) ).finalize();
 
-print(query3hash.explain());
 
 start = time();
-for line in readResult(query3hash):
+for line in readResult(db.query().fromTable('customer').finalize()):
   print(line);
 end = time();
 print("Time for query3hash: " + str(end-start));           

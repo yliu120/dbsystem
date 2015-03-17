@@ -17,10 +17,10 @@ db.createRelation('employeeeee2', [('id2', 'int'), ('age2', 'int'), ('desc2', 'c
 schema1 = db.relationSchema('employeeeee')
 schema2 = db.relationSchema('employeeeee2')
 
-for tup in [schema1.pack(schema1.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,20000)]:
+for tup in [schema1.pack(schema1.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,10000)]:
   _ = db.insertTuple(schema1.name, tup)
 
-for tup in [schema2.pack(schema2.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,20000)]:
+for tup in [schema2.pack(schema2.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,10000)]:
   _ = db.insertTuple(schema2.name, tup)
 
 keySchema  = DBSchema('employeeKey',  [('id', 'int')])
@@ -30,8 +30,8 @@ query5 = db.query().fromTable('employeeeee').join( \
           db.query().fromTable('employeeeee2'), \
           rhsSchema=schema2, \
           method='hash', \
-          lhsHashFn='hash(id) % 4',  lhsKeySchema=keySchema, \
-          rhsHashFn='hash(id2) % 4', rhsKeySchema=keySchema2, \
+          lhsHashFn=(lambda e : e.id % 4),  lhsKeySchema=keySchema, \
+          rhsHashFn=(lambda e : e.id2 % 4), rhsKeySchema=keySchema2, \
         ).finalize()
 
 print(query5.explain());

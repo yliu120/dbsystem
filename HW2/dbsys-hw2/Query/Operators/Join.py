@@ -256,30 +256,40 @@ class Join(Operator):
     self.logger("start...");
     self.cleanBufferPool(bufPool);
     
+    tmpFilesL = dict();
+    tmpFilesR = dict();
+    
+    self.logger("building L partition");
     for (PageId, Page) in iter(self.lhsPlan):
-      self.buildPartitionL(PageId, Page);
+      self.buildPartitionL(PageId, Page, tmpFilesL);
+    
+    self.logger("building R partition");
     for (PageId, Page) in iter(self.rhsPlan):
-      self.buildPartitionR(PageId, Page);
+      self.buildPartitionR(PageId, Page, tmpFilesR);
       
     # Schema prep
     lSchema = self.inputSchemas()[0];
     rSchema = self.inputSchemas()[1];
       
-    for relIdTmpL in self.tmpFilesL:
+    for relIdLKey in tmpFilesL.keys():
        
       # Clean up before running.  
-      self.cleanBufferPool( bufPool );
-      relIdTmpR = relIdTmpL.rstrip('L') + 'R';
+      if relIdLKey in tmpFilesR:
+          (_, relIdTmpR) = tmpFilesR[ relIdLKey ];
+          (_, relIdTmpL) = tmpFilesL[ relIdLKey ];
+      else:
+          continue;
       
-      if (self.storage.hasRelation(relIdTmpR)):
-        lhsPlan = TableScan(relIdTmpL, self.inputSchemas()[0]);
-        rhsPlan = TableScan(relIdTmpR, self.inputSchemas()[1]);
+      self.cleanBufferPool( bufPool );
+      
+      lhsPlan = TableScan(relIdTmpL, self.inputSchemas()[0]);
+      rhsPlan = TableScan(relIdTmpR, self.inputSchemas()[1]);
         
-        lhsPlan.storage = self.storage;
-        rhsPlan.storage = self.storage;
+      lhsPlan.storage = self.storage;
+      rhsPlan.storage = self.storage;
         
-        # Filling in-memory hash table
-        for pageBlock in self.accessPageBlock( bufPool, iter(lhsPlan) ):
+      # Filling in-memory hash table
+      for pageBlock in self.accessPageBlock( bufPool, iter(lhsPlan) ):
             
           # Building a in-memory hash table
           hasher = dict();
@@ -302,6 +312,7 @@ class Join(Operator):
               if key in hasher:
                 for lTuple in hasher[ key ]:
                   joinIns = self.loadSchema( lSchema, lTuple )
+                  print( joinIns );
                   joinIns.update( self.loadSchema( rSchema, rTuple ) );
                   outputTuple = self.joinSchema.instantiate(*[joinIns[f] for f in self.joinSchema.fields]);
                   outputTupleP = self.joinSchema.pack(outputTuple);
@@ -310,52 +321,49 @@ class Join(Operator):
           for lPageId in pageBlock:
             bufPool.unpinPage(lPageId);
             bufPool.discardPage(lPageId);
-        
+          
+          self.cleanBufferPool(bufPool);
           del hasher;
-          gc.collect();
-        self.storage.removeRelation(relIdTmpL);
-        self.storage.removeRelation(relIdTmpR);
-    
+      
+      self.storage.removeRelation(relIdTmpL);
+      self.storage.removeRelation(relIdTmpR);
+      
     return self.storage.pages(self.relationId());
         
 
-  def buildPartitionL(self, PageId, Page):
+  def buildPartitionL(self, PageId, Page, tmpFileL):
+    
     inputSchema  = self.lhsSchema;
     for inputTuple in Page:
-      inputL = self.loadSchema(inputSchema, inputTuple);
+      inputL = inputSchema.unpack( inputTuple );
+      key    = self.lhsHashFn( inputL );
       
-      relIdTmp = self.relationId() + str(eval(self.lhsHashFn, globals(), inputL)) + "HashJoinTmpL";
-      
-    
-      if not(self.storage.hasRelation(relIdTmp)):
+      if key not in tmpFileL:
+        relIdTmp = self.relationId() + str(key) + "HashJoinTmpL";
         self.storage.createRelation(relIdTmp, inputSchema);
         tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
-        tempFile.insertTuple( inputTuple );
-        self.tmpFilesL.append(relIdTmp);
+        tmpFileL[ key ] = (tempFile, relIdTmp);
+        
+      (file, _) = tmpFileL[ key ];
+      file.insertTuple( inputTuple );
       
-      else:
-        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
-        tempFile.insertTuple( inputTuple );
 
-  def buildPartitionR(self, PageId, Page):
+  def buildPartitionR(self, PageId, Page, tmpFileR):
+      
     inputSchema  = self.rhsSchema;
+    
     for inputTuple in Page:
-      inputR = self.loadSchema(inputSchema, inputTuple);
+      inputR = inputSchema.unpack( inputTuple );
+      key    = self.rhsHashFn( inputR );
       
-      relIdTmp = self.relationId() + str(eval(self.rhsHashFn, globals(), inputR)) + "HashJoinTmpR";
-      
-      
-      if not(self.storage.hasRelation(relIdTmp)):
+      if key not in tmpFileR:
+        relIdTmp = self.relationId() + str(key) + "HashJoinTmpR";
         self.storage.createRelation(relIdTmp, inputSchema);
         tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
-        tempFile.insertTuple( inputTuple );
-        self.tmpFilesR.append(relIdTmp);
-      
-      else:
-        tempFile = self.storage.fileMgr.relationFile(relIdTmp)[1];
-        tempFile.insertTuple( inputTuple );
-
-
+        tmpFileR[ key ] = (tempFile, relIdTmp);
+        
+      (file, _) = tmpFileR[ key ];
+      file.insertTuple( inputTuple );
 
   # Plan and statistics information
 
@@ -374,9 +382,7 @@ class Join(Operator):
       exprs = "(" + ','.join(filter(lambda x: x is not None, (
           [ "expr='" + str(self.joinExpr) + "'" if self.joinExpr else None ]
         + [ "lhsKeySchema=" + self.lhsKeySchema.toString() ,
-            "rhsKeySchema=" + self.rhsKeySchema.toString() ,
-            "lhsHashFn='" + self.lhsHashFn + "'" ,
-            "rhsHashFn='" + self.rhsHashFn + "'" ]
+            "rhsKeySchema=" + self.rhsKeySchema.toString() ]
         ))) + ")"
     
     return super().explain() + exprs

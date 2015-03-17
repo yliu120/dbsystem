@@ -24,6 +24,60 @@ SQL Query. Question 1:
          and ps.supplycost < 5;
 '''
 
+#Query 1 -- hash join:
+'''
+lhsKeySchema1 = DBSchema('partsupp', [('PS_PARTKEY', 'int')])
+rhsKeySchema1 = DBSchema('part', [('P_PARTKEY','int')])
+
+lhsKeySchema2 = DBSchema('partsupp', [('PS_SUPPKEY', 'int')])
+rhsKeySchema2 = DBSchema('supplier', [('S_SUPPKEY','int')])
+
+part = db.query().fromTable('part').select({'P_NAME':('P_NAME','char(55)'), 'P_PARTKEY':('P_PARTKEY','int')});
+partsupp = db.query().fromTable('partsupp').where('PS_AVAILQTY == 1').select({'PS_PARTKEY':('PS_PARTKEY','int'), 'PS_SUPPKEY':('PS_SUPPKEY','int')})
+supplier = db.query().fromTable('supplier').select({'S_NAME':('S_NAME','char(25)'), 'S_SUPPKEY':('S_SUPPKEY', 'int')})
+
+join_ps_p = partsupp.join(\
+              part, \
+              rhsSchema = DBSchema('part', [('P_NAME','char(55)'), ('P_PARTKEY','int')]), \
+              method = 'hash', \
+              lhsHashFn = 'hash(PS_PARTKEY) % 5', lhsKeySchema = lhsKeySchema1,\
+              rhsHashFn = 'hash(P_PARTKEY) % 5', rhsKeySchema = rhsKeySchema1);
+              
+join_three = join_ps_p.join(\
+               supplier, \
+               rhsSchema = DBSchema('supplier', [('S_NAME','char(25)'), ('S_SUPPKEY', 'int')]), \
+               method = 'hash',
+               lhsHashFn = 'hash(PS_SUPPKEY) % 5', lhsKeySchema = lhsKeySchema2,\
+               rhsHashFn = 'hash(S_SUPPKEY) % 5', rhsKeySchema = rhsKeySchema2,\
+               ).select({'P_NAME':('P_NAME','char(55)'), 'S_NAME':('S_NAME','char(25)')});
+
+partsupp2 = db.query().fromTable('partsupp').where('PS_SUPPLYCOST < 5').select({'PS_PARTKEY':('PS_PARTKEY','int'), 'PS_SUPPKEY':('PS_SUPPKEY','int')})
+
+join_ps_p2 = partsupp2.join(\
+              part, \
+              rhsSchema = DBSchema('part', [('P_NAME','char(55)'), ('P_PARTKEY','int')]), \
+              method = 'hash', \
+              lhsHashFn = 'hash(PS_PARTKEY) % 5', lhsKeySchema = lhsKeySchema1,\
+              rhsHashFn = 'hash(P_PARTKEY) % 5', rhsKeySchema = rhsKeySchema1);
+              
+join_three2 = join_ps_p2.join(\
+               supplier, \
+               rhsSchema = DBSchema('supplier', [('S_NAME','char(25)'), ('S_SUPPKEY', 'int')]), \
+               method = 'hash',
+               lhsHashFn = 'hash(PS_SUPPKEY) % 5', lhsKeySchema = lhsKeySchema2,\
+               rhsHashFn = 'hash(S_SUPPKEY) % 5', rhsKeySchema = rhsKeySchema2,\
+               ).select({'P_NAME':('P_NAME','char(55)'), 'S_NAME':('S_NAME','char(25)')});
+               
+query1hash = join_three.union( join_three2 ).finalize();
+print(query1hash.explain())
+
+
+start = time()
+for line in readResult(query1hash):
+  print(line);
+end = time()
+print("Execution time: " + str(end - start))
+'''
 '''
 SQL Query. Question 2:
   select part.name, count(*) as count
@@ -75,6 +129,34 @@ for line in readResult(query22):
 end = time();
 print("Time for query 22: " + str(end-start));
 '''
+
+# 
+'''
+ls1 = DBSchema('partkey1',[('p_partkey', 'int')]);
+rs1 = DBSchema('partkey2',[('L_PARTKEY', 'int')]);
+
+pSchema = db.relationSchema('part');
+lSchema = DBSchema('liselect',[('L_PARTKEY', 'int')]);
+keySchema = DBSchema('groupByKey', [('p_name', 'char(55)')]);
+groupBySchema = DBSchema('groupBy', [('count','int')]);
+
+query2hash = db.query().fromTable('part').select({'p_name': ('P_NAME', 'char(55)'), 'p_partkey': ('P_PARTKEY', 'int')}).join( \
+        db.query().fromTable('lineitem').where("L_RETURNFLAG == 'R'"), \
+        method='hash', \
+        lhsHashFn='hash(p_partkey) % 10',  lhsKeySchema=ls1, \
+        rhsHashFn='hash(L_PARTKEY) % 10', rhsKeySchema=rs1).groupBy( \
+        groupSchema=keySchema, \
+          aggSchema=groupBySchema, \
+          groupExpr=(lambda e: e.p_name), \
+          aggExprs=[(0, lambda acc, e: acc + 1, lambda x: x)], \
+          groupHashFn=(lambda gbVal: hash(gbVal) % 10)).finalize();
+          
+start = time();
+for line in readResult(query22):
+  print(line);
+end = time();
+print("Time for query2hash: " + str(end-start));
+'''
 '''
 SQL Query. Question 3:
   create table temp as
@@ -96,42 +178,61 @@ SQL Query. Question 3:
   Then nation < part < customer < orders
 '''
 
-# 
-keySchema31 = DBSchema('groupByKey', [('L_ORDERKEY', 'int'),('L_PARTKEY', 'int')]);
-aggSchema31 = DBSchema('groupByagg', [('num1', 'int')]);
+# prepare queries
+nation = db.query().fromTable('nation').select({'N_NATIONKEY':('N_NATIONKEY','int'), 'N_NAME':('N_NAME', 'char(25)')});
+part   = db.query().fromTable('part').select({'P_PARTKEY':('P_PARTKEY','int'), 'P_NAME':('P_NAME','char(55)')});
+orders = db.query().fromTable('orders').select({'O_ORDERKEY':('O_ORDERKEY','int'), 'O_CUSTKEY':('O_CUSTKEY','int')});
+line   = db.query().fromTable('lineitem').select({'L_ORDERKEY':('L_ORDERKEY','int'),'L_PARTKEY':('L_PARTKEY','int'), 'L_QUANTITY':('L_QUANTITY','float')});
+customer = db.query().fromTable('customer').select({'C_NATIONKEY':('C_NATIONKEY','int'),'C_CUSTKEY':('C_CUSTKEY','int')});
 
-keySchema32 = DBSchema('groupByKey1', [('N_NAME', 'char(25)'),('p_name', 'char(55)')]);
-aggSchema32 = DBSchema('groupByagg1', [('num', 'int')]);
+nc = nation.join(\
+       customer, \
+       rhsSchema = DBSchema('c',[('C_NATIONKEY','int'),('C_CUSTKEY','int')]), \
+       method = 'hash', \
+       lhsHashFn=lambda e : e.N_NATIONKEY % 5, lhsKeySchema=DBSchema('ls1',[('N_NATIONKEY','int')]), \
+       rhsHashFn=lambda e : e.C_NATIONKEY % 5, rhsKeySchema=DBSchema('rs1',[('C_NATIONKEY','int')]))
 
-query31 = db.query().fromTable('nation').join(\
-           db.query().fromTable('customer'), \
-             method='block-nested-loops', expr="c_nationkey == N_NATIONKEY").join(\
-               db.query().fromTable('orders')),
-                 method='block-nested-loops', expr="c_custkey == o_custkey").finalize();
-           
-           
-           
-           .join( \
-             db.query().fromTable('orders').select({'o_custkey': ('O_CUSTKEY','int'), 'o_orderkey' : ('O_ORDERKEY', 'int')}).join( \
-               db.query().fromTable('lineitem').groupBy(
-                 groupSchema=keySchema31, \
-                 aggSchema=aggSchema31, \
-                 groupExpr=(lambda e: (e.L_ORDERKEY, e.L_PARTKEY)), \
-                 aggExprs=[(0, lambda acc, e: acc + e.L_QUANTITY, lambda x: x)], \
-                 groupHashFn=(lambda gbVal: gbVal % 10)).join( \
-                   db.query().fromTable('part').select({'p_name' : ('P_NAME', 'char(55)'), 'p_partkey' : ('P_PARTKEY','int')}), \
-                   method='block-nested-loops', expr="p_partkey == L_PARTKEY"), \
-                     method='block-nested-loops', expr="o_orderkey = L_ORDERKEY"), \
-                       method='block-nested-loops', expr="c_custkey = o_custkey"), \
-                         method='block-nested-loops', expr="c_nationkey = N_NATIONKEY").groupBy( \
-                           groupSchema=keySchema32, \
-                           aggSchema=aggSchema32, \
-                           groupExpr=(lambda e: (e.N_NAME, e.p_name)), \
-                           aggExprs=[(0, lambda acc, e: acc + e.num1, lambda x: x)], \
-                           groupHashFn=(lambda gbVal: hash(gbVal) % 10));
-                         
+nco = nc.join(\
+       orders, \
+       method = 'hash', \
+       lhsHashFn=lambda e : e.C_CUSTKEY % 5, lhsKeySchema=DBSchema('ls2',[('C_CUSTKEY','int')]), \
+       rhsHashFn=lambda e : e.O_CUSTKEY % 5, rhsKeySchema=DBSchema('rs2',[('O_CUSTKEY','int')]))
+
+ncol = nco.join(\
+        line, \
+        rhsSchema = DBSchema('l',[('L_ORDERKEY','int'),('L_PARTKEY','int'),('L_QUANTITY','float')]), \
+        method = 'hash', \
+        lhsHashFn=lambda e : e.O_ORDERKEY % 5, lhsKeySchema=DBSchema('ls3',[('O_ORDERKEY','int')]), \
+        rhsHashFn=lambda e : e.L_ORDERKEY % 5, rhsKeySchema=DBSchema('rs3',[('L_ORDERKEY','int')]))
+
+all  = ncol.join(\
+        part, \
+        rhsSchema = DBSchema('p', [('P_PARTKEY','int'),('P_NAME','char(55)')]),\
+        method = 'hash', \
+        lhsHashFn=lambda e : e.L_PARTKEY % 5, lhsKeySchema=DBSchema('ls4',[('L_PARTKEY','int')]), \
+        rhsHashFn=lambda e : e.P_PARTKEY % 5, rhsKeySchema=DBSchema('rs4',[('P_PARTKEY','int')])
+        )
+
+allgroup1 = all.groupBy(\
+              groupSchema=DBSchema('gb1',[('N_NAME','char(25)'), ('P_NAME','char(55)')]), \
+              aggSchema=DBSchema('agg1',[('num','float')]), \
+              groupExpr=(lambda e: (e.N_NAME, e.P_NAME) ), \
+              aggExprs=[(0, lambda acc, e: acc + e.L_QUANTITY, lambda x: x)], \
+              groupHashFn=(lambda gbVal: hash(gbVal) % 10)
+             )
+
+query3hash = allgroup1.groupBy(\
+              groupSchema=DBSchema('gb2',[('N_NAME','char(25)')]), \
+              aggSchema=DBSchema('agg1',[('max','float')]), \
+              groupExpr=(lambda e: e.N_NAME ), \
+              aggExprs=[(0, lambda acc, e: max(acc, e.num), lambda x: x)], \
+              groupHashFn=(lambda gbVal: hash(gbVal) % 10) ).finalize();
+
+
 start = time();
-for line in readResult(query31):
+for line in readResult(db.query().fromTable('customer').finalize()):
   print(line);
 end = time();
-print("Time for query 31: " + str(end-start));
+print("Time for query3hash: " + str(end-start));           
+                 
+                 
