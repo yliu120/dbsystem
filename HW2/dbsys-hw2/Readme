@@ -1,0 +1,38 @@
+##########################################################################
+					HW2 : Query
+					Qing Liu
+					Yunlong Liu
+##########################################################################
+
+Features:
+
+1) We implemented all the exercises except the indexed nested loop join.
+2) We added a logger to the codebase since often times queries take a
+   long time and we want to track where it is
+3) We implements all the queries with only hash join. Since BNLJ is very
+   slow even running with the small dataset.
+4) We changed the codebase to fix some bugs:
+   i) iterator bug: the same operator runs twice
+   ii) index manager can't restore, no db.im file in the provide binary
+
+Experiments:
+1) Berkeley db: file -> hw2.sql 
+                command to run: dbsql hw2.db < hw2.sql
+2) Queries    : file -> hw2.py
+                command to run: python3 hw2.py
+3) Plot tools : plot.py
+
+4) We provides some test files to test that each of our operators can
+   work well separately. Combine operators into queries may cause errors.
+   We don't have enough time to debug this.
+
+Comments:
+
+1) The code base is so slow that running a query needs time. This is not
+   convenient for us to debug code. (especially project operator)
+2) BNLJ is super slow that no experimental queries can work on that.
+3) Sometimes python really works poorly on big dataset calculation.
+
+Bugs:
+1) BNLJ is super slow.
+2) HashJoin loses data when combining with other itself.
