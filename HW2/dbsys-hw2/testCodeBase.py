@@ -180,7 +180,7 @@ SQL Query. Question 3:
 
 # prepare queries
 nation = db.query().fromTable('nation').select({'N_NATIONKEY':('N_NATIONKEY','int'), 'N_NAME':('N_NAME', 'char(25)')});
-part   = db.query().fromTable('part').select({'P_PARTKEY':('P_PARTKEY','int'), 'P_NAME':('P_NAME','char(55)')});
+part   = db.query().fromTable('part');
 orders = db.query().fromTable('orders').select({'O_ORDERKEY':('O_ORDERKEY','int'), 'O_CUSTKEY':('O_CUSTKEY','int')});
 line   = db.query().fromTable('lineitem').select({'L_ORDERKEY':('L_ORDERKEY','int'),'L_PARTKEY':('L_PARTKEY','int'), 'L_QUANTITY':('L_QUANTITY','float')});
 customer = db.query().fromTable('customer').select({'C_NATIONKEY':('C_NATIONKEY','int'),'C_CUSTKEY':('C_CUSTKEY','int')});
@@ -207,7 +207,6 @@ ncol = nco.join(\
 
 all  = ncol.join(\
         part, \
-        rhsSchema = DBSchema('p', [('P_PARTKEY','int'),('P_NAME','char(55)')]),\
         method = 'hash', \
         lhsHashFn=lambda e : e.L_PARTKEY % 5, lhsKeySchema=DBSchema('ls4',[('L_PARTKEY','int')]), \
         rhsHashFn=lambda e : e.P_PARTKEY % 5, rhsKeySchema=DBSchema('rs4',[('P_PARTKEY','int')])
