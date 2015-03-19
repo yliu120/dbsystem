@@ -162,28 +162,48 @@ class Join(Operator):
   # for its block of the outer relation.
 
   def blockNestedLoops(self):
+    bufPool = self.storage.bufferPool;
+    lSchema = self.inputSchemas()[0];
+    rSchema = self.inputSchemas()[1];
+    
+    lhsKey = self.joinExpr.split('==')[0].strip();
+    rhsKey = self.joinExpr.split('==')[1].strip();
+
+    self.cleanBufferPool(bufPool);
     
     self.logger("starting...")
-    for pageBlock in self.accessPageBlock(self.storage.bufferPool, iter(self.lhsPlan)):
+    for pageBlock in self.accessPageBlock(bufPool, iter(self.lhsPlan)):
+      hasher = dict();
+    
+      for lPageId in pageBlock:
+        lhsPage = bufPool.getPage(lPageId);
+        for lTuple in iter(lhsPage):
+          tupleObj = lSchema.unpack(lTuple);
+          key = getattr(tupleObj, lhsKey);
+          if key in hasher:
+            hasher[key].append(lTuple);
+          else:
+            hasher[key] = [lTuple];
+      
       for (rPageId, rhsPage) in iter(self.rhsPlan):
         for rTuple in iter(rhsPage):
-          joinExprEnv = self.loadSchema(self.rhsSchema, rTuple);
-      
-          for lPageId in pageBlock:
-            lhsPage = self.storage.bufferPool.getPage(lPageId);
-            for lTuple in iter(lhsPage):
-          
-              joinExprEnv.update(self.loadSchema(self.lhsSchema, lTuple));
-              
-              if eval(self.joinExpr, globals(), joinExprEnv):
-                outputTuple = self.joinSchema.instantiate(*[joinExprEnv[f] for f in self.joinSchema.fields]);
-                #self.emitOutputTuple(self.joinSchema.pack(outputTuple));
-                outputTupleP = self.joinSchema.pack(outputTuple);
-                self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP); 
+          tupleObj = rSchema.unpack(rTuple);
+          key = getattr(tupleObj, rhsKey);
+          if key in hasher:
+            joinExprEnv = self.loadSchema(rSchema, rTuple);
+            for lTuple in hasher[key]:
+              joinExprEnv.update(self.loadSchema(lSchema, lTuple));
+              outputTuple = self.joinSchema.instantiate(*[joinExprEnv[f] for f in self.joinSchema.fields]);
+              outputTupleP = self.joinSchema.pack(outputTuple);
+              self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP); 
         
       for lPageId in pageBlock:
         self.storage.bufferPool.unpinPage(lPageId);
         self.storage.bufferPool.discardPage(lPageId);
+      
+      self.cleanBufferPool(bufPool);
+      del hasher;
+      
       self.logger("ending...");
     return self.storage.pages(self.relationId());
 
