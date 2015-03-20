@@ -16,17 +16,17 @@ db.createRelation('employee2', [('id2', 'int'), ('age2', 'int'), ('desc2', 'char
 schema1 = db.relationSchema('employee')
 schema2 = db.relationSchema('employee2')
 
-for tup in [schema1.pack(schema1.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,20000)]:
+for tup in [schema1.pack(schema1.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,1000)]:
   _ = db.insertTuple(schema1.name, tup)
 
-for tup in [schema2.pack(schema2.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,20000)]:
+for tup in [schema2.pack(schema2.instantiate(i, random.randint(0,50), 'This is a testing tuple.')) for i in range(0,10000)]:
   _ = db.insertTuple(schema2.name, tup)
  ### SELECT * FROM Employee E1 JOIN Employee E2 ON E1.id = E2.id
  
 query4 = db.query().fromTable('employee').join( \
         db.query().fromTable('employee2'), \
         rhsSchema=schema2, \
-        method='block-nested-loops', expr='id == id2').finalize()
+        method='block-nested-loops', expr='age == age2').finalize()
 
 print(query4.explain())
 

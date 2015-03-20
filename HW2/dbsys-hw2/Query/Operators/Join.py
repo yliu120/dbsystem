@@ -173,6 +173,7 @@ class Join(Operator):
     
     self.logger("starting...")
     for pageBlock in self.accessPageBlock(bufPool, iter(self.lhsPlan)):
+      self.logger("one new pageBlock...");
       hasher = dict();
     
       for lPageId in pageBlock:
@@ -205,6 +206,7 @@ class Join(Operator):
       del hasher;
       
       self.logger("ending...");
+      
     return self.storage.pages(self.relationId());
 
   # Accesses a block of pages from an iterator.
@@ -260,14 +262,7 @@ class Join(Operator):
   #
   def hashJoin(self):
     if self.joinExpr == None:
-      self.joinExpr = "(" + self.lhsKeySchema.fields[0] + "==" + self.rhsKeySchema.fields[0] + ")";
-      if len(self.lhsKeySchema.fields) > 1:
-        for i in range(1, len(self.lhsKeySchema.fields)):
-          self.joinExpr += " and " + "(" + self.lhsKeySchema.fields[i] + "==" + self.rhsKeySchema.fields[i] + ")";
-      
-    else:
-      for i in range(0, len(self.lhsKeySchema.fields)):
-        self.joinExpr += " and " + "(" + self.lhsKeySchema.fields[i] + "==" + self.rhsKeySchema.fields[i] + ")";
+      self.joinExpr = self.lhsKeySchema.fields[0] + "==" + self.rhsKeySchema.fields[0];
     
     self.tmpFilesL = list();
     self.tmpFilesR = list();
@@ -308,45 +303,10 @@ class Join(Operator):
       lhsPlan.storage = self.storage;
       rhsPlan.storage = self.storage;
       
-        
-      # Filling in-memory hash table
-      for pageBlock in self.accessPageBlock( bufPool, iter(lhsPlan) ):
-          
-          # Building a in-memory hash table
-          hasher = dict();
+      self.lhsPlan = lhsPlan;
+      self.rhsPlan = rhsPlan;
       
-          for lPageId in pageBlock:
-            lhsPage = bufPool.getPage(lPageId);
-            for ltuple in iter( lhsPage ):
-              tupleObj = lSchema.unpack( ltuple );
-              key      = lSchema.project( tupleObj, self.lhsKeySchema )[0];
-              if key in hasher:
-                hasher[ key ].append( ltuple );
-              else:
-                hasher[ key ] = [ ltuple ];
-
-          # iterating all rtuples to pack output
-          for (rPageId, rhsPage) in iter(rhsPlan):
-            # print( rPageId.pageIndex );
-            for rTuple in iter( rhsPage ):
-              tupleObj = rSchema.unpack( rTuple );
-              # print( tupleObj );
-              key      = rSchema.project( tupleObj, self.rhsKeySchema )[0];
-              if key in hasher:
-                for lTuple in hasher[ key ]:
-                  joinIns = self.loadSchema( lSchema, lTuple )
-                  joinIns.update( self.loadSchema( rSchema, rTuple ) );
-                  outputTuple = self.joinSchema.instantiate(*[joinIns[f] for f in self.joinSchema.fields]);
-                  # print( outputTuple );
-                  outputTupleP = self.joinSchema.pack(outputTuple);
-                  self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP);
-                  
-          for lPageId in pageBlock:
-            bufPool.unpinPage(lPageId);
-            bufPool.discardPage(lPageId);
-          
-          self.cleanBufferPool(bufPool);
-          del hasher;
+      _ = self.blockNestedLoops();  
       
       self.storage.removeRelation(relIdTmpL);
       self.storage.removeRelation(relIdTmpR);
