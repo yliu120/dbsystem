@@ -307,17 +307,17 @@ class Join(Operator):
 
           # iterating all rtuples to pack output
           for (rPageId, rhsPage) in iter(rhsPlan):
-            # print( rPageId.pageIndex );
+            print( rPageId.pageIndex );
             for rTuple in iter( rhsPage ):
               tupleObj = rSchema.unpack( rTuple );
-              # print( tupleObj );
+              print( tupleObj );
               key      = rSchema.project( tupleObj, self.rhsKeySchema )[0];
               if key in hasher:
                 for lTuple in hasher[ key ]:
                   joinIns = self.loadSchema( lSchema, lTuple )
                   joinIns.update( self.loadSchema( rSchema, rTuple ) );
                   outputTuple = self.joinSchema.instantiate(*[joinIns[f] for f in self.joinSchema.fields]);
-                  # print( outputTuple );
+                  print( outputTuple );
                   outputTupleP = self.joinSchema.pack(outputTuple);
                   self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP);
                   
