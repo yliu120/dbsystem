@@ -40,15 +40,15 @@ join_ps_p = partsupp.join(\
               part, \
               rhsSchema = DBSchema('part', [('P_NAME','char(55)'), ('P_PARTKEY','int')]), \
               method = 'hash', \
-              lhsHashFn = 'hash(PS_PARTKEY) % 5', lhsKeySchema = lhsKeySchema1,\
-              rhsHashFn = 'hash(P_PARTKEY) % 5', rhsKeySchema = rhsKeySchema1);
+              lhsHashFn = lambda e: e.PS_PARTKEY % 5, lhsKeySchema = lhsKeySchema1,\
+              rhsHashFn = lambda e: e.P_PARTKEY % 5, rhsKeySchema = rhsKeySchema1);
               
 join_three = join_ps_p.join(\
                supplier, \
                rhsSchema = DBSchema('supplier', [('S_NAME','char(25)'), ('S_SUPPKEY', 'int')]), \
                method = 'hash',
-               lhsHashFn = 'hash(PS_SUPPKEY) % 5', lhsKeySchema = lhsKeySchema2,\
-               rhsHashFn = 'hash(S_SUPPKEY) % 5', rhsKeySchema = rhsKeySchema2,\
+               lhsHashFn = lambda e: e.PS_SUPPKEY % 5, lhsKeySchema = lhsKeySchema2,\
+               rhsHashFn = lambda e: e.S_SUPPKEY % 5, rhsKeySchema = rhsKeySchema2,\
                ).select({'P_NAME':('P_NAME','char(55)'), 'S_NAME':('S_NAME','char(25)')});
 
 partsupp2 = db.query().fromTable('partsupp').where('PS_SUPPLYCOST < 5').select({'PS_PARTKEY':('PS_PARTKEY','int'), 'PS_SUPPKEY':('PS_SUPPKEY','int')})
@@ -57,15 +57,15 @@ join_ps_p2 = partsupp2.join(\
               part, \
               rhsSchema = DBSchema('part', [('P_NAME','char(55)'), ('P_PARTKEY','int')]), \
               method = 'hash', \
-              lhsHashFn = 'hash(PS_PARTKEY) % 5', lhsKeySchema = lhsKeySchema1,\
-              rhsHashFn = 'hash(P_PARTKEY) % 5', rhsKeySchema = rhsKeySchema1);
+              lhsHashFn = lambda e: e.PS_PARTKEY % 5, lhsKeySchema = lhsKeySchema1,\
+              rhsHashFn = lambda e: e.P_PARTKEY % 5, rhsKeySchema = rhsKeySchema1);
               
 join_three2 = join_ps_p2.join(\
                supplier, \
                rhsSchema = DBSchema('supplier', [('S_NAME','char(25)'), ('S_SUPPKEY', 'int')]), \
                method = 'hash',
-               lhsHashFn = 'hash(PS_SUPPKEY) % 5', lhsKeySchema = lhsKeySchema2,\
-               rhsHashFn = 'hash(S_SUPPKEY) % 5', rhsKeySchema = rhsKeySchema2,\
+               lhsHashFn = lambda e: e.PS_SUPPKEY % 5, lhsKeySchema = lhsKeySchema2,\
+               rhsHashFn = lambda e: e.S_SUPPKEY % 5, rhsKeySchema = rhsKeySchema2,\
                ).select({'P_NAME':('P_NAME','char(55)'), 'S_NAME':('S_NAME','char(25)')});
                
 query1hash = join_three.union( join_three2 ).finalize();
@@ -100,8 +100,8 @@ groupBySchema = DBSchema('groupBy', [('count','int')]);
 query2hash = db.query().fromTable('part').select({'p_name': ('P_NAME', 'char(55)'), 'p_partkey': ('P_PARTKEY', 'int')}).join( \
         db.query().fromTable('lineitem').where("L_RETURNFLAG == 'R'"), \
         method='hash', \
-        lhsHashFn='hash(p_partkey) % 10',  lhsKeySchema=ls1, \
-        rhsHashFn='hash(L_PARTKEY) % 10', rhsKeySchema=rs1).groupBy( \
+        lhsHashFn = lambda e: e.p_partkey % 10,  lhsKeySchema=ls1, \
+        rhsHashFn = lambda e: e.L_PARTKEY % 10, rhsKeySchema=rs1).groupBy( \
         groupSchema=keySchema, \
           aggSchema=groupBySchema, \
           groupExpr=(lambda e: e.p_name), \
