@@ -6,7 +6,7 @@ db = Database(dataDir='./data')
 
 def readResult( query ):
     for page in db.processQuery(query):
-        for tup in page[1]:
+        for tup in iter(page[1]):
             yield query.schema().unpack(tup);
             
 '''
@@ -229,7 +229,7 @@ query3hash = allgroup1.groupBy(\
 
 
 start = time();
-for line in readResult(nco.finalize()):
+for line in readResult(query3hash.finalize()):
   print(line);
 end = time();
 print("Time for query3hash: " + str(end-start));           

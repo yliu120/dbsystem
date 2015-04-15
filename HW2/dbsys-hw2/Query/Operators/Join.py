@@ -306,7 +306,42 @@ class Join(Operator):
       self.lhsPlan = lhsPlan;
       self.rhsPlan = rhsPlan;
       
+<<<<<<< HEAD
+          for lPageId in pageBlock:
+            lhsPage = bufPool.getPage(lPageId);
+            for ltuple in iter( lhsPage ):
+              tupleObj = lSchema.unpack( ltuple );
+              key      = lSchema.project( tupleObj, self.lhsKeySchema )[0];
+              if key in hasher:
+                hasher[ key ].append( ltuple );
+              else:
+                hasher[ key ] = [ ltuple ];
+
+          # iterating all rtuples to pack output
+          for (rPageId, rhsPage) in iter(rhsPlan):
+            print( rPageId.pageIndex );
+            for rTuple in iter( rhsPage ):
+              tupleObj = rSchema.unpack( rTuple );
+              print( tupleObj );
+              key      = rSchema.project( tupleObj, self.rhsKeySchema )[0];
+              if key in hasher:
+                for lTuple in hasher[ key ]:
+                  joinIns = self.loadSchema( lSchema, lTuple )
+                  joinIns.update( self.loadSchema( rSchema, rTuple ) );
+                  outputTuple = self.joinSchema.instantiate(*[joinIns[f] for f in self.joinSchema.fields]);
+                  print( outputTuple );
+                  outputTupleP = self.joinSchema.pack(outputTuple);
+                  self.storage.fileMgr.relationFile(self.relationId())[1].insertTuple(outputTupleP);
+                  
+          for lPageId in pageBlock:
+            bufPool.unpinPage(lPageId);
+            bufPool.discardPage(lPageId);
+          
+          self.cleanBufferPool(bufPool);
+          del hasher;
+=======
       _ = self.blockNestedLoops();  
+>>>>>>> ce34258cdacae7978542570232c903367cf2843e
       
       self.storage.removeRelation(relIdTmpL);
       self.storage.removeRelation(relIdTmpR);
