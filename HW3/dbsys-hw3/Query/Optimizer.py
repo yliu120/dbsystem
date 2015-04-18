@@ -53,6 +53,23 @@ class Optimizer:
   # projection operations pushed down to their nearest defining relation
   # This does not need to cascade operators, but should determine a
   # suitable ordering for selection predicates based on the cost model below.
+  # (Algorithm)
+  #    Basically, we consider two situations
+  #    i)  Alias of fields would be created during projection
+  #    ii) Some fields may be projected out prior to join operators if they
+  #        are directly pushed down.
+  #    To resolve i) and ii),
+  #    i) We traverse the tree to grab out all the fields and their alias.
+  #    ii) When we visit a join operator, we marked the join conditions as
+  #        required and we carry these information down
+  #    
+  #    After we correctly deal with i) and ii)
+  #    For each relation (Tablescan), we invoke cost models to compute the
+  #    selectivity of expressions regarding to the same field. We filter out
+  #    some unnecessary expressions. Meanwhile, we will consider whether to serve
+  #    selection or projection first for each relation.
+  
+  #    throughout the entire algo, we will keep some data structures.
   def pushdownOperators(self, plan):
     raise NotImplementedError
 
