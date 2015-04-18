@@ -1,4 +1,5 @@
 import itertools
+from collections import deque
 
 from Query.Plan import Plan
 from Query.Operators.Join import Join
@@ -70,6 +71,39 @@ class Optimizer:
   #    selection or projection first for each relation.
   
   #    throughout the entire algo, we will keep some data structures.
+  
+  # Helper functions
+  
+  # correcting all the unary operator and match each operator to one relation
+  def correctUnary(self, plan):
+    selectExprs  = [];
+    projections = [];
+    tableScans  = dict();    
+    # traverse the plan tree
+    unarys      = plan.sources;
+    
+    # sort out all different unary operators
+    for op in unarys:
+      if op.operatorType() == "TableScan":
+        if op.relId not in tableScans:
+          tableScans[ op.relId ] = op.schema().fields;
+      elif op.operatorType() == "Select":
+        selectExprs.append( op.selectExpr );
+      else:
+        projections.append( op );
+     
+    # build fields alias:
+    fieldAlias = buildAlias( projections, tableScans );   
+    # process expressions for selections
+    modifiedSel = modifySelect( selectExprs, fieldAlias );
+    # ...
+    
+  # This function returns a fieldAlias reference dictionary
+  def buildAlias(self, projlst, tableLst):
+    
+      
+     
+     
   def pushdownOperators(self, plan):
     raise NotImplementedError
 
