@@ -183,12 +183,19 @@ class Optimizer:
         # push down project through join
         operator.subPlan = pushdownProjections( subPlan );
         return operator;
-    
+
+  def pushdownSelections(self, operator):
+    return operator;
+
   def pushdownOperators(self, plan):
+      
     if plan.root:
       newroot = self.pushdownProjections( plan.root );
+      ultroot = self.pushdownSelections( newroot );
       plan.root = newroot;
       return plan;
+    else:
+      raise ValueError("An Empty Plan cannot be optimized.")
 
   # Returns an optimized query plan with joins ordered via a System-R style
   # dyanmic programming algorithm. The plan cost should be compared with the
