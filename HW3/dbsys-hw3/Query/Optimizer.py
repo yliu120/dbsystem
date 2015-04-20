@@ -6,7 +6,6 @@ from Query.Operators.Join import Join
 from Query.Operators.Project import Project
 from Query.Operators.Select import Select
 from Utils.ExpressionInfo import ExpressionInfo
-from sets import Set
 
 class Optimizer:
   """
@@ -136,7 +135,7 @@ class Optimizer:
         # The first step is to collect input fields needed directly.
         # We grab out the fields in the projectExprs first
         # and then filter them with the project inputSchema
-        fields = Set();
+        fields = set();
         outputNames = [k for (k, (v1, _)) in operator.projectExprs];
         inputNames  = operator.inputSchemas()[0].fields;
         lhsPlanNames= subPlan.lhsPlan.schema().fields;
@@ -154,7 +153,7 @@ class Optimizer:
         if subPlan.joinMethod == "nested-loops" or subPlan.joinMethod == "block-nested-loops":
           fields.union( ExpressionInfo( subPlan.joinExpr ).getAttributes() );
         elif self.joinMethod == "hash":
-          fields.union( Set( self.lhsKeySchema.fields + self.rhsKeySchema.fields ) );
+          fields.union( set( self.lhsKeySchema.fields + self.rhsKeySchema.fields ) );
         else:
           # We don't support indexed
           raise NotImplementedError;
