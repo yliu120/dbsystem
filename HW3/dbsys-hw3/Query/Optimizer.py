@@ -74,6 +74,18 @@ class Optimizer:
   #    throughout the entire algo, we will keep some data structures.
   
   # Helper functions
+  # list1 < list2
+  def isSubList(self, list1, list2):
+    if list2:
+      if len(list1) <= len(list2):
+        for ele in list1:
+          if ele not in list2:
+            return False;
+        return True;
+      else:
+        return False;
+    else:
+      raise ValueError("list2 cannot be null.")   
 
   def pushdownProjections(self, operator):
     
@@ -186,14 +198,184 @@ class Optimizer:
         return operator;
 
   def pushdownSelections(self, operator):
-    return operator;
-
+    if operator.operatorType() == "TableScan":
+      return operator;
+    elif ( operator.operatorType() == "Project" or operator.operatorType() == "GroupBy") :
+      newSubPlan  = self.pushdownSelections( operator.subPlan );
+      operator.subPlan = newSubPlan;
+      return operator;
+    elif ( operator.operatorType() == "UnionAll" or operator.operatorType()[-4:] == "Join" ):
+      newlPlan = self.pushdownSelections( operator.lhsPlan );
+      newrPlan = self.pushdownSelections( operator.rhsPlan );
+      operator.lhsPlan = newlPlan;
+      operator.rhsPlan = newrPlan;
+      return operator;
+    else:
+      # Here we deal with the Select Case
+      # This is a lot harder than other cases
+      subPlan = operator.subPlan;
+      # trivial case
+      if subPlan.operatorType() == "TableScan":
+        return operator;
+      # In this case we need to combine two selections
+      elif subPlan.operatorType() == "Select":
+        operator.selectExpr = "(" + operator.selectExpr + ")" + " and " + "(" + subPlan.selectExpr + ")";
+        operator.subPlan = subPlan.subPlan;
+        del subPlan;
+        return self.pushdownSelections( operator );
+      # We don't have to move selections through groupby since
+      # groupby may create new field names
+      elif subPlan.operatorType() == "GroupBy":
+        newSubSubPlan = self.pushdownSelections( subPlan.subPlan );
+        subPlan.subPlan = newSubSubPlan;
+        return operator;
+      elif subPlan.operatorType() == "UnionAll":
+        subPlan.lhsPlan = Select(subPlan.lhsPlan, operator.selectExpr);
+        subPlan.rhsPlan = Select(subPlan.rhsPlan, operator.selectExpr);
+        subPlan.validateSchema();
+        del operator;
+        return self.pushdownSelections( subPlan );
+    
+      # Some tricky behavior here.
+      # We substitute all some tokens in selectExpr by the projectExpr.
+      # However, here we only support some easy computations. We cannot
+      # exhaustively test all the cases (all the math exprs)
+      elif subPlan.operatorType() == "Project":
+        selectExpr  = operator.selectExpr;
+        for (k, (v1, _)) in subPlan.projectExprs.items():
+          selectExpr = selectExpr.replace( k, "(" + v1 + ")" );
+        operator.subPlan = subPlan.subPlan;
+        subPlan.subPlan  = operator;
+        return self.pushdownSelections( subPlan );
+      else:
+        # Here we move the selections down to the Join Operator
+        lhsPlanNames = subPlan.lhsPlan.schema().fields;
+        rhsPlanNames = subPlan.rhsPlan.schema().fields;
+        cnfExprList  = ExpressionInfo( operator.selectExpr ).decomposeCNF();
+        
+        lhsSelectExpr = "";
+        rhsSelectExpr = "";
+        remSelectExpr = "";
+        
+        for expr in cnfExprList:
+          attributes = [];
+          # filter attributes
+          for var in ExpressionInfo( expr ).getAttributes():
+            if (var in lhsPlanNames):
+              attributes.append( var );
+            if (var in rhsPlanNames):
+              attributes.append( var );  
+              
+          if self.isSubList(attributes, lhsPlanNames):
+            if lhsSelectExpr == "":
+              lhsSelectExpr += "(" + expr + ")";
+            else:
+              lhsSelectExpr += " and " + "(" + expr + ")";
+              
+          elif self.isSubList(attributes, rhsPlanNames):
+            if rhsSelectExpr == "":
+              rhsSelectExpr += "(" + expr + ")";
+            else:
+              rhsSelectExpr += " and " + "(" + expr + ")"; 
+              
+          else:
+            if remSelectExpr == "":
+              remSelectExpr += "(" + expr + ")";
+            else:
+              remSelectExpr += " and " + "(" + expr + ")";
+              
+        # push down selections
+        if remSelectExpr == "":
+          # A case that the selection all comes from lhsPlan
+          if (lhsSelectExpr != "" and rhsSelectExpr == ""):
+            operator.subPlan = subPlan.lhsPlan;
+            operator.selectExpr = lhsSelectExpr;
+            subPlan.lhsPlan  = operator;
+          elif (rhsSelectExpr != "" and lhsSelectExpr == ""):    
+            operator.subPlan = subPlan.rhsPlan;
+            operator.selectExpr = rhsSelectExpr;
+            subPlan.rhsPlan  = operator;
+          else:
+            subPlan.lhsPlan = Select( subPlan.lhsPlan, lhsSelectExpr );
+            subPlan.rhsPlan = Select( subPlan.rhsPlan, rhsSelectExpr );
+            del operator;
+          
+          return self.pushdownSelections( subPlan );
+        else:
+          operator.selectExpr = remSelectExpr;
+          if (lhsSelectExpr != "" and rhsSelectExpr == ""):
+            subPlan.lhsPlan = Select( subPlan.lhsPlan, lhsSelectExpr );
+          elif (rhsSelectExpr != "" and lhsSelectExpr == ""):    
+            subPlan.rhsPlan = Select( subPlan.rhsPlan, rhsSelectExpr );
+          else:
+            subPlan.lhsPlan = Select( subPlan.lhsPlan, lhsSelectExpr );
+            subPlan.rhsPlan = Select( subPlan.rhsPlan, rhsSelectExpr );
+          
+          if subPlan.validateJoin():
+            subPlan.initializeSchema();
+          operator.subPlan = self.pushdownSelections( subPlan );
+          return operator;
+      
+  # This function helps remove select project disorder;
+  def reorderSelProj(self, operator):
+    if operator.operatorType() == "TableScan":
+      return operator;
+    elif ( operator.operatorType() == "Project" or operator.operatorType() == "GroupBy") :
+      operator.subPlan = self.reorderSelProj( operator.subPlan );
+      return operator;
+    elif ( operator.operatorType() == "UnionAll" or operator.operatorType()[-4:] == "Join" ):
+      operator.lhsPlan = self.reorderSelProj( operator.lhsPlan );
+      operator.rhsPlan = self.reorderSelProj( operator.rhsPlan );
+      return operator;
+    else:
+      subPlan = operator.subPlan;
+      if subPlan.operatorType() == "Project":
+        subSubPlan   = subPlan.subPlan;
+        subSubOutput = [ k for (k, v) in subSubPlan.schema().schema() ];
+        
+        selectFields = [ v for v in ExpressionInfo( operator.selectExpr ).getAttributes() ];
+        # we can't filter selectFields because of the getAttributes weakness
+        # We assume that we can prohibit Math.sqrt and etc here.
+        if self.isSubList(selectFields, subSubOutput):
+          operator.subPlan = subSubPlan;
+          subPlan.subPlan  = self.reorderSelProj( operator );
+          return subPlan;
+        else:
+          operator.subPlan = self.reorderSelProj( operator.subPlan );
+          return operator;
+      else:
+        operator.subPlan = self.reorderSelProj( operator.subPlan );
+        return operator;
+    
+  # Here we provide a bottom-up validation of all the operator;          
+  def validate(self, operator):
+    if operator.operatorType() == "TableScan":
+      return operator.schema();
+    elif operator.operatorType() == "Select":
+      return self.validate(operator.subPlan);
+    elif operator.operatorType() == "Project":
+      self.validate( operator.subPlan );
+      return DBSchema( operator.relationId(), \
+                          [(k, v[1]) for (k,v) in operator.projectExprs.items()])
+    elif operator.operatorType() == "GroupBy":
+      self.validate( operator.subPlan );
+      return operator.schema();
+    elif operator.operatorType() == "UnionAll":
+      return self.validate( operator.subPlan );
+    else:
+      operator.lhsSchema = self.validate( operator.lhsPlan );
+      operator.rhsSchema = self.validate( operator.rhsPlan );
+      operator.initializeSchema();
+      return operator.schema();
+          
   def pushdownOperators(self, plan):
       
     if plan.root:
-      newroot = self.pushdownProjections( plan.root );
-      ultroot = self.pushdownSelections( newroot );
-      plan.root = newroot;
+      newroot = self.pushdownSelections( plan.root );
+      ultroot = self.pushdownProjections( newroot );
+      finalroot = self.reorderSelProj( ultroot );
+      self.validate( finalroot );
+      plan.root = finalroot;
       return plan;
     else:
       raise ValueError("An Empty Plan cannot be optimized.")

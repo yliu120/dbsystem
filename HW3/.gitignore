@@ -2,6 +2,10 @@
 data/
 .DS_Store
 data
+.rel
+index/
+.fm
+.im
 .project
 .pydevproject
 # Byte-compiled / optimized / DLL files
