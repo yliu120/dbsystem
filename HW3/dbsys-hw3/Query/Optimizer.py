@@ -74,6 +74,18 @@ class Optimizer:
   #    throughout the entire algo, we will keep some data structures.
   
   # Helper functions
+  # list1 < list2
+  def isSubList(self, list1, list2):
+    if list2:
+      if len(list1) <= len(list2):
+        for ele in list1:
+          if ele not in list2:
+            return False;
+        return True;
+      else:
+        return False;
+    else:
+      raise ValueError("list2 cannot be null.")   
 
   def pushdownProjections(self, operator):
     
@@ -240,14 +252,77 @@ class Optimizer:
         lhsPlanNames = subPlan.lhsPlan.schema().fields;
         rhsPlanNames = subPlan.rhsPlan.schema().fields;
         cnfExprList  = ExpressionInfo( operator.selectExpr ).decomposeCNF();
-        return operator;
+        
+        lhsSelectExpr = "";
+        rhsSelectExpr = "";
+        remSelectExpr = "";
+        
+        for expr in cnfExprList:
+          attributes = [];
+          # filter attributes
+          for var in ExpressionInfo( expr ).getAttributes():
+            if (var in lhsPlanNames):
+              attributes.append( var );
+            if (var in rhsPlanNames):
+              attributes.append( var );  
+          
+          print( attributes );
+              
+          if self.isSubList(attributes, lhsPlanNames):
+            if lhsSelectExpr == "":
+              lhsSelectExpr += "(" + expr + ")";
+            else:
+              lhsSelectExpr += " and " + "(" + expr + ")";
+              
+          elif self.isSubList(attributes, rhsPlanNames):
+            if rhsSelectExpr == "":
+              rhsSelectExpr += "(" + expr + ")";
+            else:
+              rhsSelectExpr += " and " + "(" + expr + ")"; 
+              
+          else:
+            if remSelectExpr == "":
+              remSelectExpr += "(" + expr + ")";
+            else:
+              remSelectExpr += " and " + "(" + expr + ")";
+              
+        # push down selections
+        if remSelectExpr == "":
+          # A case that the selection all comes from lhsPlan
+          if (lhsSelectExpr != "" and rhsSelectExpr == ""):
+            operator.subPlan = subPlan.lhsPlan;
+            operator.selectExpr = lhsSelectExpr;
+            subPlan.lhsPlan  = operator;
+            return self.pushdownSelections( subPlan );
+          elif (rhsSelectExpr != "" and lhsSelectExpr == ""):    
+            operator.subPlan = subPlan.rhsPlan;
+            operator.selectExpr = rhsSelectExpr;
+            subPlan.rhsPlan  = operator;
+            return self.pushdownSelections( subPlan );
+          else:
+            subPlan.lhsPlan = Select( subPlan.lhsPlan, lhsSelectExpr );
+            subPlan.rhsPlan = Select( subPlan.rhsPlan, rhsSelectExpr );
+            del operator;
+            return self.pushdownSelections( subPlan );
+        else:
+          operator.selectExpr = remSelectExpr;
+          if (lhsSelectExpr != "" and rhsSelectExpr == ""):
+            subPlan.lhsPlan = Select( subPlan.lhsPlan, lhsSelectExpr );
+          elif (rhsSelectExpr != "" and lhsSelectExpr == ""):    
+            subPlan.rhsPlan = Select( subPlan.rhsPlan, rhsSelectExpr );
+          else:
+            subPlan.lhsPlan = Select( subPlan.lhsPlan, lhsSelectExpr );
+            subPlan.rhsPlan = Select( subPlan.rhsPlan, rhsSelectExpr );
+          
+          operator.subPlan = self.pushdownSelections( subPlan );
+          return operator;
 
   def pushdownOperators(self, plan):
       
     if plan.root:
-      newroot = self.pushdownProjections( plan.root );
-      ultroot = self.pushdownSelections( newroot );
-      plan.root = newroot;
+      newroot = self.pushdownSelections( plan.root );
+      ultroot = self.pushdownProjections( newroot )
+      plan.root = ultroot;
       return plan;
     else:
       raise ValueError("An Empty Plan cannot be optimized.")

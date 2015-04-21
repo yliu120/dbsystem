@@ -23,7 +23,7 @@ query = db.query().fromTable('part').join( \
           db.query().fromTable('lineitem'), \
           method = 'hash', \
           lhsHashFn = 'hash(P_PARTKEY) % 4', lhsKeySchema = ls1, \
-          rhsHashFn = 'hash(L_PARTKEY) % 4', rhsKeySchema = rs1).where("L_RETURNFLAG == 'R'").select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')}).groupBy( \
+          rhsHashFn = 'hash(L_PARTKEY) % 4', rhsKeySchema = rs1).where("L_RETURNFLAG == 'R' and P_PARTKEY > 10000 and (L_PARTKEY + P_PARTKEY) > 20000").select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')}).groupBy( \
             groupSchema=keySchema, \
             aggSchema=groupBySchema, \
             groupExpr=(lambda e: e.P_NAME), \
