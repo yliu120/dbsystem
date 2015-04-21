@@ -147,7 +147,7 @@ class Optimizer:
           for name in attributes:
             if name not in inputNames:
               attributes.remove( name );
-          fields.union( attributes );
+          fields = fields.union( attributes );
               
         # collecting join condition fields;
         if subPlan.joinMethod == "nested-loops" or subPlan.joinMethod == "block-nested-loops":
