@@ -223,10 +223,23 @@ class Optimizer:
         subPlan.validateSchema();
         del operator;
         return self.pushdownSelections( subPlan );
+    
       # Some tricky behavior here.
+      # We substitute all some tokens in selectExpr by the projectExpr.
+      # However, here we only support some easy computations. We cannot
+      # exhaustively test all the cases (all the math exprs)
       elif subPlan.operatorType() == "Project":
-        return operator
+        selectExpr  = operator.selectExpr;
+        for (k, (v1, _)) in subPlan.projectExprs.items():
+          selectExpr = selectExpr.replace( k, "(" + v1 + ")" );
+        operator.subPlan = subPlan.subPlan;
+        subPlan.subPlan  = operator;
+        return self.pushdownSelections( subPlan );
       else:
+        # Here we move the selections down to the Join Operator
+        lhsPlanNames = subPlan.lhsPlan.schema().fields;
+        rhsPlanNames = subPlan.rhsPlan.schema().fields;
+        cnfExprList  = ExpressionInfo( operator.selectExpr ).decomposeCNF();
         return operator;
 
   def pushdownOperators(self, plan):
