@@ -96,7 +96,7 @@ class Optimizer:
         subSubPlan = subPlan.subPlan;
         operator.subPlan = subSubPlan;
         subPlan.subPlan = operator;
-        return subPlan;
+        return self.pushdownProjections( subPlan );
       elif subPlan.operatorType() == "GroupBy":
         newSubSubPlan = self.pushdownProjections( subPlan.subPlan );
         subPlan.subPlan = newSubSubPlan;
@@ -121,14 +121,14 @@ class Optimizer:
         operator.outputSchema  = DBSchema(operator.relationId(), \
                           [(k, v[1]) for (k,v) in operator.projectExprs.items()])
         operator.subPlan      = subPlan.subPlan;
-        return pushdownProjections( operator );
+        return self.pushdownProjections( operator );
       elif subPlan.operatorType() == "UnionAll":
         # For Union operator, the push down is very simple
         subPlan.lhsPlan = Project(subPlan.lhsPlan, operator.projectExprs);
         subPlan.rhsPlan = Project(subPlan.rhsPlan, operator.projectExprs);
         subPlan.validateSchema();
         del operator;
-        return pushdownProjections( subPlan );
+        return self.pushdownProjections( subPlan );
       else:
         # Here we deal with the Join Case
         # This is a lot harder than other cases
@@ -136,12 +136,12 @@ class Optimizer:
         # We grab out the fields in the projectExprs first
         # and then filter them with the project inputSchema
         fields = set();
-        outputNames = [k for (k, (v1, _)) in operator.projectExprs];
+        outputNames = [k for (k, (v1, _)) in operator.projectExprs.items()];
         inputNames  = operator.inputSchemas()[0].fields;
         lhsPlanNames= subPlan.lhsPlan.schema().fields;
         rhsPlanNames= subPlan.rhsPlan.schema().fields;
 
-        for (k, (v1, _)) in operator.projectExprs:
+        for (k, (v1, _)) in operator.projectExprs.items():
           attributes = ExpressionInfo( v1 ).getAttributes();
           # filter attributes
           for name in attributes:
@@ -152,8 +152,8 @@ class Optimizer:
         # collecting join condition fields;
         if subPlan.joinMethod == "nested-loops" or subPlan.joinMethod == "block-nested-loops":
           fields.union( ExpressionInfo( subPlan.joinExpr ).getAttributes() );
-        elif self.joinMethod == "hash":
-          fields.union( set( self.lhsKeySchema.fields + self.rhsKeySchema.fields ) );
+        elif subPlan.joinMethod == "hash":
+          fields.union( set( subPlan.lhsKeySchema.fields + subPlan.rhsKeySchema.fields ) );
         else:
           # We don't support indexed
           raise NotImplementedError;
@@ -161,26 +161,26 @@ class Optimizer:
         # constructing virtual l and r projections
         lprojectExpr = dict();
         rprojectExpr = dict();
-        for (f, v) in subPlan.lhsPlan.schema():
+        for (f, v) in subPlan.lhsPlan.schema().schema():
           if f in fields:
             lprojectExpr[ f ] = (f, v);
-        for (f, v) in subPlan.rhsPlan.schema():
+        for (f, v) in subPlan.rhsPlan.schema().schema():
           if f in fields:
             rprojectExpr[ f ] = (f, v);
             
-        if not ( len(lprojectExpr) == len(subPlan.lhsPlan.schema()) ):
+        if not ( len(lprojectExpr) == len(subPlan.lhsPlan.schema().schema()) ) :
           subPlan.lhsPlan = Project( subPlan.lhsPlan, lprojectExpr );
           subPlan.lhsPlan.outputSchema  = DBSchema(subPlan.lhsPlan.relationId(), \
                           [(k, v[1]) for (k,v) in subPlan.lhsPlan.projectExprs.items()])
           
-        if not ( len(rprojectExpr) == len(subPlan.rhsPlan.schema()) ):
+        if not ( len(rprojectExpr) == len(subPlan.rhsPlan.schema().schema()) ):
           subPlan.rhsPlan = Project( subPlan.rhsPlan, rprojectExpr );
           subPlan.rhsPlan.outputSchema  = DBSchema(subPlan.rhsPlan.relationId(), \
                           [(k, v[1]) for (k,v) in subPlan.rhsPlan.projectExprs.items()])
           
         subPlan.validateSchema();
         # push down project through join
-        operator.subPlan = pushdownProjections( subPlan );
+        operator.subPlan = self.pushdownProjections( subPlan );
         return operator;
 
   def pushdownSelections(self, operator):
