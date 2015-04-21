@@ -265,8 +265,6 @@ class Optimizer:
               attributes.append( var );
             if (var in rhsPlanNames):
               attributes.append( var );  
-          
-          print( attributes );
               
           if self.isSubList(attributes, lhsPlanNames):
             if lhsSelectExpr == "":
@@ -316,13 +314,45 @@ class Optimizer:
           
           operator.subPlan = self.pushdownSelections( subPlan );
           return operator;
-
+      
+  # This function helps remove select project disorder;
+  def reorderSelProj(self, operator):
+    if operator.operatorType() == "TableScan":
+      return operator;
+    elif ( operator.operatorType() == "Project" or operator.operatorType() == "GroupBy") :
+      operator.subPlan = self.reorderSelProj( operator.subPlan );
+      return operator;
+    elif ( operator.operatorType() == "UnionAll" or operator.operatorType()[-4:] == "Join" ):
+      operator.lhsPlan = self.reorderSelProj( operator.lhsPlan );
+      operator.rhsPlan = self.reorderSelProj( operator.rhsPlan );
+      return operator;
+    else:
+      subPlan = operator.subPlan;
+      if subPlan.operatorType() == "Project":
+        subSubPlan   = subPlan.subPlan;
+        subSubOutput = [ k for (k, v) in subSubPlan.schema().schema() ];
+        
+        selectFields = [ v for v in ExpressionInfo( operator.selectExpr ).getAttributes() ];
+        # we can't filter selectFields because of the getAttributes weakness
+        # We assume that we can prohibit Math.sqrt and etc here.
+        if self.isSubList(selectFields, subSubOutput):
+          operator.subPlan = subSubPlan;
+          subPlan.subPlan  = self.reorderSelProj( operator );
+          return subPlan;
+        else:
+          operator.subPlan = self.reorderSelProj( operator.subPlan );
+          return operator;
+      else:
+        operator.subPlan = self.reorderSelProj( operator.subPlan );
+        return operator;
+            
   def pushdownOperators(self, plan):
       
     if plan.root:
       newroot = self.pushdownSelections( plan.root );
-      ultroot = self.pushdownProjections( newroot )
-      plan.root = ultroot;
+      ultroot = self.pushdownProjections( newroot );
+      finalroot = self.reorderSelProj( ultroot );
+      plan.root = finalroot;
       return plan;
     else:
       raise ValueError("An Empty Plan cannot be optimized.")
