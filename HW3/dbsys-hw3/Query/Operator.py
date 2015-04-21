@@ -40,14 +40,6 @@ class Operator:
   def inputs(self):
     raise NotImplementedError
 
-  @property
-  def arity(self):
-    return len(self.inputs()) if self.inputs() else 0
-
-  @property
-  def deep_max_arity(self):
-    return max([self.arity] + [op.arity for op in self.inputs()])
-
   # Prepares the operator for execution.
   def prepare(self, database):
     self.storage = database.storageEngine()
@@ -80,6 +72,7 @@ class Operator:
   # The operator implementation must store this tuple in an output page, allocating a
   # new output page as necessary.
   def emitOutputTuple(self, tupleData):
+    
     if self.tempFile is None:
       self.initializeOutput()
 
@@ -96,7 +89,8 @@ class Operator:
       outputPage = self.outputPages[-1][1]
 
     outputPage.insertTuple(tupleData)
-
+    if self.operatorType()[-4:] == "Join":
+      print( self.schema().unpack( tupleData ) );
     if self.sampled:
       self.estimatedCardinality += 1
     else:

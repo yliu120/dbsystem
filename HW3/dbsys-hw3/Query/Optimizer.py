@@ -347,34 +347,42 @@ class Optimizer:
         operator.subPlan = self.reorderSelProj( operator.subPlan );
         return operator;
     
-  # Here we provide a bottom-up validation of all the operator;          
-  def validate(self, operator):
+  # Here we provide a bottom-up validation of all the operator; 
+  # The basic idea is that we massed up with schema and storage when we
+  # push down plans.         
+  def validate(self, operator, storage):
     if operator.operatorType() == "TableScan":
       return operator.schema();
     elif operator.operatorType() == "Select":
-      return self.validate(operator.subPlan);
+      operator.storage = storage;
+      return self.validate(operator.subPlan, storage);
     elif operator.operatorType() == "Project":
-      self.validate( operator.subPlan );
+      operator.storage = storage;
+      self.validate( operator.subPlan, storage );
       return DBSchema( operator.relationId(), \
                           [(k, v[1]) for (k,v) in operator.projectExprs.items()])
     elif operator.operatorType() == "GroupBy":
-      self.validate( operator.subPlan );
+      self.validate( operator.subPlan, storage );
+      operator.storage = storage;
       return operator.schema();
     elif operator.operatorType() == "UnionAll":
-      return self.validate( operator.subPlan );
+      operator.storage = storage;
+      return self.validate( operator.subPlan, storage );
     else:
-      operator.lhsSchema = self.validate( operator.lhsPlan );
-      operator.rhsSchema = self.validate( operator.rhsPlan );
+      operator.lhsSchema = self.validate( operator.lhsPlan, storage );
+      operator.rhsSchema = self.validate( operator.rhsPlan, storage );
       operator.initializeSchema();
+      operator.storage = storage;
       return operator.schema();
           
   def pushdownOperators(self, plan):
       
     if plan.root:
+      storage = plan.root.storage;
       newroot = self.pushdownSelections( plan.root );
       ultroot = self.pushdownProjections( newroot );
       finalroot = self.reorderSelProj( ultroot );
-      self.validate( finalroot );
+      self.validate( finalroot, storage );
       plan.root = finalroot;
       return plan;
     else:
