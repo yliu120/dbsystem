@@ -186,7 +186,20 @@ class Optimizer:
         return operator;
 
   def pushdownSelections(self, operator):
-    return operator;
+    if operator.operatorType() == "TableScan":
+      return operator;
+    elif ( operator.operatorType() == "Project" or operator.operatorType() == "GroupBy") :
+      newSubPlan  = self.pushdownSelections( operator.subPlan );
+      operator.subPlan = newSubPlan;
+      return operator;
+    elif ( operator.operatorType() == "UnionAll" or operator.operatorType()[-4:] == "Join" ):
+      newlPlan = self.pushdownSelections( operator.lhsPlan );
+      newrPlan = self.pushdownSelections( operator.rhsPlan );
+      operator.lhsPlan = newlPlan;
+      operator.rhsPlan = newrPlan;
+      return operator;
+    else:
+      return operator;
 
   def pushdownOperators(self, plan):
       
