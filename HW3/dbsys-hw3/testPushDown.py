@@ -23,7 +23,7 @@ query = db.query().fromTable('part').join( \
           db.query().fromTable('lineitem'), \
           method = 'hash', \
           lhsHashFn = 'hash(P_PARTKEY) % 4', lhsKeySchema = ls1, \
-          rhsHashFn = 'hash(L_PARTKEY) % 4', rhsKeySchema = rs1).where("L_RETURNFLAG == 'R' and P_PARTKEY > 10000 and (L_PARTKEY + P_PARTKEY) > 20000").select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')}).groupBy( \
+          rhsHashFn = 'hash(L_PARTKEY) % 4', rhsKeySchema = rs1).where("L_RETURNFLAG == 'R' and P_PARTKEY > 100").select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')}).groupBy( \
             groupSchema=keySchema, \
             aggSchema=groupBySchema, \
             groupExpr=(lambda e: e.P_NAME), \
@@ -38,6 +38,10 @@ print( queryOpt.explain() );
 
 # queryTest = db.query().fromTable('part').select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('(P_PARTKEY+1)', 'int')}).finalize();
 
+for page in db.processQuery( query ):
+  for tup in page[1]:
+    print( query.schema().unpack(tup) );
+     
 for page in db.processQuery( queryOpt ):
         for tup in page[1]:
             print( queryOpt.schema().unpack(tup) );
