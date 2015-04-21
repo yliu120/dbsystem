@@ -199,7 +199,35 @@ class Optimizer:
       operator.rhsPlan = newrPlan;
       return operator;
     else:
-      return operator;
+      # Here we deal with the Select Case
+      # This is a lot harder than other cases
+      subPlan = operator.subPlan;
+      # trivial case
+      if subPlan.operatorType() == "TableScan":
+        return operator;
+      # In this case we need to combine two selections
+      elif subPlan.operatorType() == "Select":
+        operator.selectExpr = "(" + operator.selectExpr + ")" + " and " + "(" + subPlan.selectExpr + ")";
+        operator.subPlan = subPlan.subPlan;
+        del subPlan;
+        return self.pushdownSelections( operator );
+      # We don't have to move selections through groupby since
+      # groupby may create new field names
+      elif subPlan.operatorType() == "GroupBy":
+        newSubSubPlan = self.pushdownSelections( subPlan.subPlan );
+        subPlan.subPlan = newSubSubPlan;
+        return operator;
+      elif subPlan.operatorType() == "UnionAll":
+        subPlan.lhsPlan = Select(subPlan.lhsPlan, operator.selectExpr);
+        subPlan.rhsPlan = Select(subPlan.rhsPlan, operator.selectExpr);
+        subPlan.validateSchema();
+        del operator;
+        return self.pushdownSelections( subPlan );
+      # Some tricky behavior here.
+      elif subPlan.operatorType() == "Project":
+        return operator
+      else:
+        return operator;
 
   def pushdownOperators(self, plan):
       
