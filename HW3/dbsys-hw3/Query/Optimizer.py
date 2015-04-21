@@ -6,6 +6,7 @@ from Query.Operators.Join import Join
 from Query.Operators.Project import Project
 from Query.Operators.Select import Select
 from Utils.ExpressionInfo import ExpressionInfo
+from Catalog.Schema import DBSchema
 
 class Optimizer:
   """
@@ -73,39 +74,129 @@ class Optimizer:
   #    throughout the entire algo, we will keep some data structures.
   
   # Helper functions
-  
-  # correcting all the unary operator and match each operator to one relation
-  def correctUnary(self, plan):
-    selectExprs  = [];
-    projections = [];
-    tableScans  = dict();    
-    # traverse the plan tree
-    unarys      = plan.sources;
+
+  def pushdownProjections(self, operator):
     
-    # sort out all different unary operators
-    for op in unarys:
-      if op.operatorType() == "TableScan":
-        if op.relId not in tableScans:
-          tableScans[ op.relId ] = op.schema().fields;
-      elif op.operatorType() == "Select":
-        selectExprs.append( op.selectExpr );
+    if operator.operatorType() == "TableScan":
+      return operator;
+    elif ( operator.operatorType() == "Select" or operator.operatorType() == "GroupBy") :
+      newSubPlan  = self.pushdownProjections( operator.subPlan );
+      operator.subPlan = newSubPlan;
+      return operator;
+    elif ( operator.operatorType() == "UnionAll" or operator.operatorType()[-4:] == "Join" ):
+      newlPlan = self.pushdownProjections( operator.lhsPlan );
+      newrPlan = self.pushdownProjections( operator.rhsPlan );
+      operator.lhsPlan = newlPlan;
+      operator.rhsPlan = newrPlan;
+      return operator;
+    else:
+      subPlan = operator.subPlan;
+      if subPlan.operatorType() == "TableScan":
+        return operator;
+      elif subPlan.operatorType() == "Select":
+        subSubPlan = subPlan.subPlan;
+        operator.subPlan = subSubPlan;
+        subPlan.subPlan = operator;
+        return self.pushdownProjections( subPlan );
+      elif subPlan.operatorType() == "GroupBy":
+        newSubSubPlan = self.pushdownProjections( subPlan.subPlan );
+        subPlan.subPlan = newSubSubPlan;
+        return operator;
+      elif subPlan.operatorType() == "Project":
+        # Note that here we need to combine two projections
+        # We assume that the upper projection must be based on the outputschema
+        # of the lower one;
+        subRepExp = { k : v1 for (k, (v1, _)) in subPlan.projectExprs.items() };
+        newExpr   = dict();
+        
+        # Combine projections
+        # TODO: Here we don't guarantee 100% success of replacement
+        for (k, (v1, v2)) in operator.projectExprs.items():
+          newV1 = v1
+          for (key, value) in subRepExp:
+            newV1 = newV1.replace(key, value);
+          newExpr[k] = (newV1, v2);
+        
+        # Reorder the projection operator
+        operator.projectExprs  = newExpr;
+        operator.outputSchema  = DBSchema(operator.relationId(), \
+                          [(k, v[1]) for (k,v) in operator.projectExprs.items()])
+        operator.subPlan      = subPlan.subPlan;
+        return self.pushdownProjections( operator );
+      elif subPlan.operatorType() == "UnionAll":
+        # For Union operator, the push down is very simple
+        subPlan.lhsPlan = Project(subPlan.lhsPlan, operator.projectExprs);
+        subPlan.rhsPlan = Project(subPlan.rhsPlan, operator.projectExprs);
+        subPlan.validateSchema();
+        del operator;
+        return self.pushdownProjections( subPlan );
       else:
-        projections.append( op );
-     
-    # build fields alias:
-    fieldAlias = buildAlias( projections, tableScans );   
-    # process expressions for selections
-    modifiedSel = modifySelect( selectExprs, fieldAlias );
-    # ...
-    
-  # This function returns a fieldAlias reference dictionary
-  def buildAlias(self, projlst, tableLst):
-    
+        # Here we deal with the Join Case
+        # This is a lot harder than other cases
+        # The first step is to collect input fields needed directly.
+        # We grab out the fields in the projectExprs first
+        # and then filter them with the project inputSchema
+        fields = set();
+        outputNames = [k for (k, (v1, _)) in operator.projectExprs.items()];
+        inputNames  = operator.inputSchemas()[0].fields;
+        lhsPlanNames= subPlan.lhsPlan.schema().fields;
+        rhsPlanNames= subPlan.rhsPlan.schema().fields;
+
+        for (k, (v1, _)) in operator.projectExprs.items():
+          attributes = ExpressionInfo( v1 ).getAttributes();
+          # filter attributes
+          for name in attributes:
+            if name not in inputNames:
+              attributes.remove( name );
+          fields = fields.union( attributes );
+              
+        # collecting join condition fields;
+        if subPlan.joinMethod == "nested-loops" or subPlan.joinMethod == "block-nested-loops":
+          fields = fields.union( ExpressionInfo( subPlan.joinExpr ).getAttributes() );
+        elif subPlan.joinMethod == "hash":
+          fields = fields.union( set( subPlan.lhsKeySchema.fields + subPlan.rhsKeySchema.fields ) );
+        else:
+          # We don't support indexed
+          raise NotImplementedError;
       
-     
-     
+        # constructing virtual l and r projections
+        lprojectExpr = dict();
+        rprojectExpr = dict();
+        for (f, v) in subPlan.lhsPlan.schema().schema():
+          if f in fields:
+            lprojectExpr[ f ] = (f, v);
+        for (f, v) in subPlan.rhsPlan.schema().schema():
+          if f in fields:
+            rprojectExpr[ f ] = (f, v);
+        
+        if len(lprojectExpr) != len(lhsPlanNames):
+          subPlan.lhsPlan = Project( subPlan.lhsPlan, lprojectExpr );
+          subPlan.lhsPlan.outputSchema  = DBSchema(subPlan.lhsPlan.relationId(), \
+                          [(k, v[1]) for (k,v) in subPlan.lhsPlan.projectExprs.items()])
+
+        if len(rprojectExpr) != len(rhsPlanNames):
+          subPlan.rhsPlan = Project( subPlan.rhsPlan, rprojectExpr );
+          subPlan.rhsPlan.outputSchema  = DBSchema(subPlan.rhsPlan.relationId(), \
+                          [(k, v[1]) for (k,v) in subPlan.rhsPlan.projectExprs.items()])
+          
+        if subPlan.validateJoin():
+          subPlan.initializeSchema();
+        # push down project through join
+        operator.subPlan = self.pushdownProjections( subPlan );
+        return operator;
+
+  def pushdownSelections(self, operator):
+    return operator;
+
   def pushdownOperators(self, plan):
-    raise NotImplementedError
+      
+    if plan.root:
+      newroot = self.pushdownProjections( plan.root );
+      ultroot = self.pushdownSelections( newroot );
+      plan.root = newroot;
+      return plan;
+    else:
+      raise ValueError("An Empty Plan cannot be optimized.")
 
   # Returns an optimized query plan with joins ordered via a System-R style
   # dyanmic programming algorithm. The plan cost should be compared with the
