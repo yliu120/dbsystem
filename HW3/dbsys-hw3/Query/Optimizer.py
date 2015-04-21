@@ -6,6 +6,7 @@ from Query.Operators.Join import Join
 from Query.Operators.Project import Project
 from Query.Operators.Select import Select
 from Utils.ExpressionInfo import ExpressionInfo
+from Catalog.Schema import DBSchema
 
 class Optimizer:
   """
@@ -151,9 +152,9 @@ class Optimizer:
               
         # collecting join condition fields;
         if subPlan.joinMethod == "nested-loops" or subPlan.joinMethod == "block-nested-loops":
-          fields.union( ExpressionInfo( subPlan.joinExpr ).getAttributes() );
+          fields = fields.union( ExpressionInfo( subPlan.joinExpr ).getAttributes() );
         elif subPlan.joinMethod == "hash":
-          fields.union( set( subPlan.lhsKeySchema.fields + subPlan.rhsKeySchema.fields ) );
+          fields = fields.union( set( subPlan.lhsKeySchema.fields + subPlan.rhsKeySchema.fields ) );
         else:
           # We don't support indexed
           raise NotImplementedError;
@@ -167,18 +168,19 @@ class Optimizer:
         for (f, v) in subPlan.rhsPlan.schema().schema():
           if f in fields:
             rprojectExpr[ f ] = (f, v);
-            
-        if not ( len(lprojectExpr) == len(subPlan.lhsPlan.schema().schema()) ) :
+        
+        if len(lprojectExpr) != len(lhsPlanNames):
           subPlan.lhsPlan = Project( subPlan.lhsPlan, lprojectExpr );
           subPlan.lhsPlan.outputSchema  = DBSchema(subPlan.lhsPlan.relationId(), \
                           [(k, v[1]) for (k,v) in subPlan.lhsPlan.projectExprs.items()])
-          
-        if not ( len(rprojectExpr) == len(subPlan.rhsPlan.schema().schema()) ):
+
+        if len(rprojectExpr) != len(rhsPlanNames):
           subPlan.rhsPlan = Project( subPlan.rhsPlan, rprojectExpr );
           subPlan.rhsPlan.outputSchema  = DBSchema(subPlan.rhsPlan.relationId(), \
                           [(k, v[1]) for (k,v) in subPlan.rhsPlan.projectExprs.items()])
           
-        subPlan.validateSchema();
+        if subPlan.validateJoin():
+          subPlan.initializeSchema();
         # push down project through join
         operator.subPlan = self.pushdownProjections( subPlan );
         return operator;
