@@ -291,17 +291,16 @@ class Optimizer:
             operator.subPlan = subPlan.lhsPlan;
             operator.selectExpr = lhsSelectExpr;
             subPlan.lhsPlan  = operator;
-            return self.pushdownSelections( subPlan );
           elif (rhsSelectExpr != "" and lhsSelectExpr == ""):    
             operator.subPlan = subPlan.rhsPlan;
             operator.selectExpr = rhsSelectExpr;
             subPlan.rhsPlan  = operator;
-            return self.pushdownSelections( subPlan );
           else:
             subPlan.lhsPlan = Select( subPlan.lhsPlan, lhsSelectExpr );
             subPlan.rhsPlan = Select( subPlan.rhsPlan, rhsSelectExpr );
             del operator;
-            return self.pushdownSelections( subPlan );
+          
+          return self.pushdownSelections( subPlan );
         else:
           operator.selectExpr = remSelectExpr;
           if (lhsSelectExpr != "" and rhsSelectExpr == ""):
@@ -312,6 +311,8 @@ class Optimizer:
             subPlan.lhsPlan = Select( subPlan.lhsPlan, lhsSelectExpr );
             subPlan.rhsPlan = Select( subPlan.rhsPlan, rhsSelectExpr );
           
+          if subPlan.validateJoin():
+            subPlan.initializeSchema();
           operator.subPlan = self.pushdownSelections( subPlan );
           return operator;
       
@@ -345,13 +346,35 @@ class Optimizer:
       else:
         operator.subPlan = self.reorderSelProj( operator.subPlan );
         return operator;
-            
+    
+  # Here we provide a bottom-up validation of all the operator;          
+  def validate(self, operator):
+    if operator.operatorType() == "TableScan":
+      return operator.schema();
+    elif operator.operatorType() == "Select":
+      return self.validate(operator.subPlan);
+    elif operator.operatorType() == "Project":
+      self.validate( operator.subPlan );
+      return DBSchema( operator.relationId(), \
+                          [(k, v[1]) for (k,v) in operator.projectExprs.items()])
+    elif operator.operatorType() == "GroupBy":
+      self.validate( operator.subPlan );
+      return operator.schema();
+    elif operator.operatorType() == "UnionAll":
+      return self.validate( operator.subPlan );
+    else:
+      operator.lhsSchema = self.validate( operator.lhsPlan );
+      operator.rhsSchema = self.validate( operator.rhsPlan );
+      operator.initializeSchema();
+      return operator.schema();
+          
   def pushdownOperators(self, plan):
       
     if plan.root:
       newroot = self.pushdownSelections( plan.root );
       ultroot = self.pushdownProjections( newroot );
       finalroot = self.reorderSelProj( ultroot );
+      self.validate( finalroot );
       plan.root = finalroot;
       return plan;
     else:

@@ -37,8 +37,8 @@ queryOpt = db.optimizer.pushdownOperators( query );
 print( queryOpt.explain() );
 
 # queryTest = db.query().fromTable('part').select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('(P_PARTKEY+1)', 'int')}).finalize();
-'''
+
 for page in db.processQuery( queryOpt ):
         for tup in page[1]:
             print( queryOpt.schema().unpack(tup) );
-'''
+
