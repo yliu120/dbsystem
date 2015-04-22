@@ -1,3 +1,5 @@
+import time;
+
 class Operator:
   """
   An abstract base class for all operator implementations.
@@ -6,6 +8,7 @@ class Operator:
   """
 
   opCount = 0
+  opMarker = int(time.time());
 
   def __init__(self, **kwargs):
     self.opId = Operator.opCount
@@ -57,7 +60,7 @@ class Operator:
 
   # Returns an identifier for this operator's output relation
   def relationId(self):
-    return "tmp_" + self.operatorType() + "_" + str(self.id())
+    return "tmp_" + self.operatorType() + "_" + str(self.id());
 
   # Python implementation of Volcano-style iterator abstraction
   def __iter__(self):

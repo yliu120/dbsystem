@@ -125,7 +125,7 @@ class Optimizer:
         # TODO: Here we don't guarantee 100% success of replacement
         for (k, (v1, v2)) in operator.projectExprs.items():
           newV1 = v1
-          for (key, value) in subRepExp:
+          for (key, value) in subRepExp.items():
             newV1 = newV1.replace(key, value);
           newExpr[k] = (newV1, v2);
         
@@ -338,8 +338,8 @@ class Optimizer:
         # We assume that we can prohibit Math.sqrt and etc here.
         if self.isSubList(selectFields, subSubOutput):
           operator.subPlan = subSubPlan;
-          subPlan.subPlan  = self.reorderSelProj( operator );
-          return subPlan;
+          subPlan.subPlan  = operator;
+          return self.reorderSelProj( subPlan );
         else:
           operator.subPlan = self.reorderSelProj( operator.subPlan );
           return operator;
