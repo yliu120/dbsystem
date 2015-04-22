@@ -298,7 +298,7 @@ class PlanBuilder:
 
   def select(self, projectExprs):
     if self.operator:
-      return PlanBuilder(operator=Project(self.operator, projectExprs), db=self.database)
+      return PlanBuilder(operator=Project(self.operator, projectExprs, pipeline=True), db=self.database)
     else:
       raise ValueError("Invalid select list")
 
