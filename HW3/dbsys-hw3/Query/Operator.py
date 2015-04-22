@@ -92,8 +92,6 @@ class Operator:
       outputPage = self.outputPages[-1][1]
 
     outputPage.insertTuple(tupleData)
-    if self.operatorType()[-4:] == "Join":
-      print( self.schema().unpack( tupleData ) );
     if self.sampled:
       self.estimatedCardinality += 1
     else:
