@@ -26,11 +26,11 @@ query1 = db.query().fromTable('lineitem').where( \
             "L_SHIPDATE >= 19940101 and L_SHIPDATE < 19950101 and \
             0.06 - 0.01 < L_DISCOUNT < 0.06 + 0.01 and L_QUANTITY < 24"). select( \
             {'revenue_p' : ('L_EXTENDEDPRICE * L_DISCOUNT', 'float')}).groupBy( \
-              groupSchema=groupKeySchema, \
-              aggSchema=groupAggSchema, \
-              groupExpr=(lambda e: 1), \
-              aggExprs=[(0, lambda acc, e: acc + e.revenue_p, lambda x: x)], \
-              groupHashFn=(lambda gbVal: hash(gbVal) % 1)).finalize();
+            groupSchema=groupKeySchema, \
+            aggSchema=groupAggSchema, \
+            groupExpr=(lambda e: 1), \
+            aggExprs=[(0, lambda acc, e: acc + e.revenue_p, lambda x: x)], \
+            groupHashFn=(lambda gbVal: hash(gbVal) % 1)).finalize();
 
 '''
 exp 2
@@ -53,18 +53,19 @@ ls1 = DBSchema('partkey2',[('L_PARTKEY', 'int')]);
 groupKeySchema = DBSchema('groupKey', [('promo_revenue_p', 'float')]);
 groupAggSchema = DBSchema('groupBy', [('promo_revenue','float')]);
 
-query1 = db.query().fromTable('lineitem').join( \
+query2 = db.query().fromTable('lineitem').join( \
             db.query().fromTable('part'),
             method = 'hash', \
             lhsHashFn = 'hash(L_PARTKEY) % 4', lhsKeySchema = ls1, \
             rhsHashFn = 'hash(P_PARTKEY) % 4', rhsKeySchema = rs1).where( \
             "L_SHIPDATE >= 19950901 and L_SHIPDATE < 19951001"). select( \
-            {'promo_revenue_p' : ('L_EXTENDEDPRICE * (1 - L_DISCOUNT)', 'decimal')}).groupBy( \
-              groupSchema=groupKeySchema, \
-              aggSchema=groupAggSchema, \
-              groupExpr=(lambda e: 1), \
-              aggExprs=[(0, lambda acc, e: acc + e.promo_revenue, lambda x: x)], \
-              groupHashFn=(lambda gbVal: hash(gbVal) % 1)).finalize();
+            {'promo_revenue_p' : ('L_EXTENDEDPRICE * (1 - L_DISCOUNT)', 'float')}).groupBy( \
+            groupSchema=groupKeySchema, \
+            aggSchema=groupAggSchema, \
+            groupExpr=(lambda e: 1), \
+            aggExprs=[(0, lambda acc, e: acc + e.promo_revenue_p, lambda x: x)], \
+            groupHashFn=(lambda gbVal: hash(gbVal) % 1)).selcet( \
+            {'promo_revenue' : ('promo_revenue','float')}).finalize();
 
 '''
 exp 3
@@ -91,4 +92,31 @@ group by
         o_orderdate,
         o_shippriority
 '''
+ls1 = DBSchema('customerKey1', [('C_CUSTKEY', 'int')]);
+rs1 = DBSchema('customerKey2', [('O_CUSTKEY', 'int')]);
 
+ls2 = DBSchema('orderKey1', [('O_ORDERKEY', 'int')]);
+rs2 = DBSchema('orderkey2', [('L_ORDERKEY', 'int')]);
+
+groupKeySchema = DBSchema('groupKey', [('L_ORDERKEY', 'int'), ('O_ORDERDATE', 'int'), ('O_SHIPPRIORITY', 'int')]);
+groupAggSchema = DBSchema('groupAgg', [('revenue','float')]);
+
+query3 = db.query().fromTable('customer').join( \
+            db.query().fromTalbe('orders'),
+            method = 'hash', \
+            lhsHashFn = 'hash(C_CUSTKEY) % 4', lhsKeySchema = ls1, \
+            rhsHashFn = 'hash(O_CUSTKEY) % 4', rhsKeySchema = rs1).join( \
+            db.query().fromTable('lineitem'),
+            method = 'hash', \
+            lhsHashFn = 'hash(O_ORDERKEY) % 4', lhsKeySchema = ls2, \
+            rhsHashFn = 'hash(L_ORDERKEY) % 4', rhsKeySchema = rs2).where( \
+            "C_MKTSEGMENT = 'BUILDING' and O_ORDERDATE < 19950315 and L_SHIPDATE > 19950315").groupBy( \
+            groupSchema=groupKeySchema, \
+            aggSchema=groupAggSchema, \
+            groupExpr=(lambda e: (e.L_ORDERKEY, e.O_ORDERDATE, e.O_SHIPPRIORITY)), \
+            aggExprs=[(0, lambda acc, e: acc + (e.L_EXTENDEDPRICE * (1 - e.L_DISCOUNT)), lambda x: x)], \
+            groupHashFn=(lambda gbVal: hash(gbVal) % 10)).select( \
+            {'l_orderkey' : ('l_orderkey', 'int'), \
+             'revenue' : ('revenue', 'float'), \
+             'o_orderdate' : ('o_orderdate', 'int'), \
+             'o_shippriority' : ('o_shippriority', 'int')}).finalize();

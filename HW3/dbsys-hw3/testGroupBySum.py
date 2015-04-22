@@ -34,8 +34,20 @@ query1 = db.query().fromTable('lineitem').where( \
               aggSchema=groupAggSchema, \
               groupExpr=(lambda e: 1), \
               aggExprs=[(0, lambda acc, e: acc + e.revenue_p, lambda x: x)], \
-              groupHashFn=(lambda gbVal: hash(gbVal) % 1)).finalize();
+              groupHashFn=(lambda gbVal: hash(gbVal) % 1)).select( \
+              {'revenue' : ('revenue', 'float')}).finalize();
+
+print( query1.explain() );
 
 for page in db.processQuery( query1 ):
   for tup in page[1]:
     print( query1.schema().unpack(tup) );
+'''
+queryOpt = db.optimizer.pushdownOperators( query1 );
+
+print( queryOpt.explain() );
+
+for page in db.processQuery( queryOpt ):
+  for tup in page[1]:
+    print( queryOpt.schema().unpack(tup) );
+    '''
