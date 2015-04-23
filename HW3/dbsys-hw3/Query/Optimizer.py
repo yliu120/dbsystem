@@ -393,14 +393,16 @@ class Optimizer:
   # use of the cost model below.
   #
   # helper functions for pickupJoin
-  def isAccessPath(self, operator):
+  def isUnaryPath(self, operator):
     if len(operator.inputs()) < 1:
       return true;
     elif len(operator.inputs()) == 1:
-      return isAccessPath( operator.subPlan );
+      return self.isUnaryPath( operator.subPlan );
     else:
       return false;
   
+  # return a dictionary:
+  # (key, value) ==> (accessPathTuple, their joinExpr) 
   def allAccessPaths(self, operator):
     totals = Plan(root=operator).flatten();
     joins  = [j for j in totals if j.operatorType()[-4:] == "Join"];
@@ -409,20 +411,68 @@ class Optimizer:
       accPs.append(j.lhsPlan);
       accPs.append(j.rhsPlan);
     
-    return [ p for p in accPs if self.isAccessPath(p) ];
+    return [p for p in accPs if self.isUnaryPath(p)];
+
+  # This function determine whether 
+  def validJoin(self, operator, aPaths ):
+    if (operator.lhsPlan in aPaths) and (operator.rhsPlan in aPaths):
+      return True;
+    elif (operator.lhsPlan in aPaths) and (operator.rhsPlan.operatorType[-4:] == "Join"):
+      rPlan          = operator.rhsPlan;  
+      subAccessPaths = self.allAccessPaths( rPlan );
+      return self.validJoin(rPlan, subAccessPaths);
+    elif (operator.rhsPlan in aPaths) and (operator.lhsPlan.operatorType[-4:] == "Join"):
+      lPlan          = operator.lhsPlan;  
+      subAccessPaths = self.allAccessPaths( lPlan );
+      return self.validJoin(lPlan, subAccessPaths);
+    else:
+      return false;
+  
+  # Our main algorithm - system R optimizer
+  def systemR(self, operator, aPaths):
+    return operator;
+  
+  # This helper function optimizes a local operator that may contain joins
+  def optimizeJoins(self, operator):
+    
+    accessPaths = self.allAccessPaths(operator);
+    if operator in accessPaths:
+      return operator;
+    else:
+      if (operator.operatorType() == "TableScan" or operator.operatorType() == "Select" or \
+         operator.operatorType() == "Project" or operator.operatorType() == "GroupBy"):
+        operator.subPlan = self.optimizeJoins( operator.subPlan );
+        return operator;
+      elif operator.operatorType() == "UnionAll":
+        operator.lhsPlan = self.optimizeJoins( operator.lhsPlan );
+        operator.rhsPlan = self.optimizeJoins( operator.rhsPlan );
+        return operator
+      else:
+        # detect whether the operator is a valid join first
+        if self.validJoin( operator, accessPaths ):
+          return self.systemR( operator, accessPaths );
+        else:
+          return operator;
+            
      
   def pickJoinOrder(self, plan):
     # For this pickJoinOrder we only support plans with all the joins in the 
-    # middle of the tree.
-    # For plans other than these, we con support a partial optimization
-    return allAccessPaths( plan.root );
+    # middle of the tree, that is, unary operators are only allow in top
+    # or bottom of the tree. 
+    # If unvalid tree is detected. the optimizer will return the original
+    # plan. This design is for the sake of time.
+    if plan.root:
+      plan.root = self.optimizeJoins( plan.root );
+      return plan;
+    else:
+      raise ValueError("Empty plan cannot be optimized.");
     
 
   # Optimize the given query plan, returning the resulting improved plan.
   # This should perform operation pushdown, followed by join order selection.
   def optimizeQuery(self, plan):
     pushedDown_plan = self.pushdownOperators(plan)
-    joinPicked_plan = self.pickJoinOrder(plan)
+    joinPicked_plan = self.pickJoinOrder(pushedDown_plan)
 
     return joinPicked_plan
 
