@@ -429,7 +429,7 @@ class Optimizer:
       return false;
   
   # Our main algorithm - system R optimizer
-  def systemR(self, operator, aPaths):
+  def joinsOptimizer(self, operator, aPaths):
     return operator;
   
   # This helper function optimizes a local operator that may contain joins
@@ -450,7 +450,7 @@ class Optimizer:
       else:
         # detect whether the operator is a valid join first
         if self.validJoin( operator, accessPaths ):
-          return self.systemR( operator, accessPaths );
+          return self.joinsOptimizer( operator, accessPaths );
         else:
           return operator;
             
