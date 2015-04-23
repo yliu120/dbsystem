@@ -38,8 +38,8 @@ query2 = db.query().fromTable('part').where("P_SIZE > 20").select( \
            {'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')} ).where("P_PARTKEY > 10000").select(
               {'P_NAME': ('P_NAME', 'char(55)') }).finalize();
 query2opt = db.optimizer.pushdownOperators( query2 );
-print( query2opt.explain() );
-query2opt.sample( 2 );
+print( queryOpt.explain() );
+queryOpt.sample( 10 );
 query3 = db.query().fromTable('part').join( \
           db.query().fromTable('lineitem'), \
           method = 'hash', \
