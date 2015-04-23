@@ -30,14 +30,26 @@ query = db.query().fromTable('part').join( \
             aggExprs=[(0, lambda acc, e: acc + 1, lambda x: x)], \
             groupHashFn=(lambda gbVal: hash(gbVal) % 10)).finalize();
 
+print( query.explain() );
 queryOpt = db.optimizer.pushdownOperators( query );
-# anything = queryOpt.sample( 10 );
 
+query2 = db.query().fromTable('part').where("P_SIZE > 20").select( \
+           {'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')} ).where("P_PARTKEY > 10000").select(
+              {'P_NAME': ('P_NAME', 'char(55)') }).finalize();
+#print( query2.explain() );
+queryOpt.sample( 10 );
+query2opt = db.optimizer.pushdownOperators( query2 );
 print( queryOpt.explain() );
+
+query3 = db.query().fromTable('part').join( \
+          db.query().fromTable('lineitem'), \
+          method = 'hash', \
+          lhsHashFn = 'hash(P_PARTKEY) % 4', lhsKeySchema = ls1, \
+          rhsHashFn = 'hash(L_PARTKEY) % 4', rhsKeySchema = rs1).where("L_RETURNFLAG == 'R' and P_PARTKEY > 10000").finalize();
 
 # queryTest = db.query().fromTable('part').select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('(P_PARTKEY+1)', 'int')}).finalize();
     
 for page in db.processQuery( queryOpt ):
     for tup in page[1]:
-        print( queryOpt.schema().unpack(tup) );
+        print( query3.schema().unpack(tup) );
 

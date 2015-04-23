@@ -292,13 +292,13 @@ class PlanBuilder:
 
   def where(self, conditionExpr):
     if self.operator:
-      return PlanBuilder(operator=Select(self.operator, conditionExpr), db=self.database)
+      return PlanBuilder(operator=Select(self.operator, conditionExpr, pipeline=True), db=self.database)
     else:
       raise ValueError("Invalid where clause")
 
   def select(self, projectExprs):
     if self.operator:
-      return PlanBuilder(operator=Project(self.operator, projectExprs), db=self.database)
+      return PlanBuilder(operator=Project(self.operator, projectExprs, pipeline=True), db=self.database)
     else:
       raise ValueError("Invalid select list")
 

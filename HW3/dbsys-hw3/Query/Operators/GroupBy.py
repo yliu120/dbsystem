@@ -138,7 +138,7 @@ class GroupBy(Operator):
   # Bucket construction helpers.
   def partitionRelationId(self, partitionId):
     return self.operatorType() + str(self.id()) + "_" \
-            + "part_" + str(partitionId)
+            + "part_" + str(partitionId) + str(self.opMarker);
 
   def emitPartitionTuple(self, partitionId, partitionTuple):
     partRelId  = self.partitionRelationId(partitionId)

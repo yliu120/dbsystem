@@ -306,8 +306,7 @@ class Join(Operator):
       self.lhsPlan = lhsPlan;
       self.rhsPlan = rhsPlan;
       
-<<<<<<< HEAD
-          for lPageId in pageBlock:
+         for lPageId in pageBlock:
             lhsPage = bufPool.getPage(lPageId);
             for ltuple in iter( lhsPage ):
               tupleObj = lSchema.unpack( ltuple );
@@ -339,9 +338,8 @@ class Join(Operator):
           
           self.cleanBufferPool(bufPool);
           del hasher;
-=======
+          
       _ = self.blockNestedLoops();  
->>>>>>> ce34258cdacae7978542570232c903367cf2843e
       
       self.storage.removeRelation(relIdTmpL);
       self.storage.removeRelation(relIdTmpR);

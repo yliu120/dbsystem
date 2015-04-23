@@ -2,6 +2,7 @@ import itertools
 
 from Catalog.Schema import DBSchema
 from Query.Operator import Operator
+from time import time;
 
 class Join(Operator):
   def __init__(self, lhsPlan, rhsPlan, **kwargs):
@@ -303,7 +304,7 @@ class Join(Operator):
   # Hash join helpers.
   def partitionRelationId(self, left, partitionId):
     return self.operatorType() + str(self.id()) + "_" \
-            + ("l" if left else "r") + "part_" + str(partitionId)
+            + ("l" if left else "r") + "part_" + str(partitionId) + str(self.opMarker);
 
   def emitPartitionTuple(self, partitionId, partitionTuple, left=False):
     partRelId  = self.partitionRelationId(left, partitionId)
@@ -320,9 +321,9 @@ class Join(Operator):
 
   # Return pairs of pages from matching partitions.
   def partitionPairs(self):
-    lKeys = self.partitionFiles[0].keys()
-    rKeys = self.partitionFiles[1].keys()
-    matches = [(self.partitionFiles[0][partId], self.partitionFiles[1][partId]) \
+    lKeys = self.partitionFiles[1].keys()
+    rKeys = self.partitionFiles[0].keys()
+    matches = [(self.partitionFiles[1][partId], self.partitionFiles[0][partId]) \
                 for partId in lKeys if partId in rKeys]
     return PartitionIterator(matches, self.storage)
 
