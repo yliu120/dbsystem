@@ -395,17 +395,17 @@ class Optimizer:
   # helper functions for pickupJoin
   def isUnaryPath(self, operator):
     if len(operator.inputs()) < 1:
-      return true;
+      return True;
     elif len(operator.inputs()) == 1:
       return self.isUnaryPath( operator.subPlan );
     else:
-      return false;
+      return False;
   
   # return a dictionary:
   # (key, value) ==> (accessPathTuple, their joinExpr) 
   def allAccessPaths(self, operator):
     totals = Plan(root=operator).flatten();
-    joins  = [j for j in totals if j.operatorType()[-4:] == "Join"];
+    joins  = [j for (_, j) in totals if j.operatorType()[-4:] == "Join"];
     accPs  = [];
     for j in joins:
       accPs.append(j.lhsPlan);
