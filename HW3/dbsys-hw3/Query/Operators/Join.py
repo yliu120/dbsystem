@@ -96,6 +96,12 @@ class Join(Operator):
 
   # Iterator abstraction for join operator.
   def __iter__(self):
+    
+    relId = self.relationId()
+
+    if self.storage.hasRelation(relId):
+      return self.storage.pages(relId);
+  
     self.initializeOutput()
     self.partitionFiles = {0:{}, 1:{}}
     self.outputIterator = self.processAllPages()
@@ -263,6 +269,7 @@ class Join(Operator):
   def hashJoin(self):
     # Partition the LHS and RHS inputs, creating a temporary file for each partition.
     # We assume one-level of partitioning is sufficient and skip recurring.
+    print("Processing " + self.explain());
     for (lPageId, lPage) in iter(self.lhsPlan):
       for lTuple in lPage:
         lPartEnv = self.loadSchema(self.lhsSchema, lTuple)
@@ -297,7 +304,7 @@ class Join(Operator):
 
     # Clean up partitions.
     self.removePartitionFiles()
-
+    print("Processing " + self.explain());
     # Return an iterator to the output relation
     return self.storage.pages(self.relationId())
 

@@ -22,8 +22,8 @@ groupBySchema = DBSchema('groupBy', [('count','int')]);
 query = db.query().fromTable('part').join( \
           db.query().fromTable('lineitem'), \
           method = 'hash', \
-          lhsHashFn = 'hash(P_PARTKEY) % 4', lhsKeySchema = ls1, \
-          rhsHashFn = 'hash(L_PARTKEY) % 4', rhsKeySchema = rs1).where("L_RETURNFLAG == 'R' and P_PARTKEY > 10").select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')}).groupBy( \
+          lhsHashFn = 'hash(P_PARTKEY) % 2', lhsKeySchema = ls1, \
+          rhsHashFn = 'hash(L_PARTKEY) % 2', rhsKeySchema = rs1).where("L_RETURNFLAG == 'R' and P_PARTKEY > 10").select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')}).groupBy( \
             groupSchema=keySchema, \
             aggSchema=groupBySchema, \
             groupExpr=(lambda e: e.P_NAME), \
@@ -39,7 +39,7 @@ query2 = db.query().fromTable('part').where("P_SIZE > 20").select( \
               {'P_NAME': ('P_NAME', 'char(55)') }).finalize();
 query2opt = db.optimizer.pushdownOperators( query2 );
 print( queryOpt.explain() );
-queryOpt.sample( 10 );
+queryOpt.sample( 50 );
 query3 = db.query().fromTable('part').join( \
           db.query().fromTable('lineitem'), \
           method = 'hash', \

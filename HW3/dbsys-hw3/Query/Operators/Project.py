@@ -39,6 +39,12 @@ class Project(Operator):
   # Iterator abstraction for projection operator.
 
   def __iter__(self):
+      
+    relId = self.relationId()
+
+    if self.storage.hasRelation(relId):
+      return self.storage.pages(relId);
+  
     self.initializeOutput()
     self.inputIterator = iter(self.subPlan)
     self.inputFinished = False
@@ -83,6 +89,7 @@ class Project(Operator):
     if self.inputIterator is None:
       self.inputIterator = iter(self.subPlan)
 
+    print("Processing " + self.explain());
     # Process all pages from the child operator.
     try:
       for (pageId, page) in self.inputIterator:
@@ -97,6 +104,7 @@ class Project(Operator):
     except StopIteration:
       pass
 
+    print("Done with " + self.explain());
     # Return an iterator to the output relation
     return self.storage.pages(self.relationId())
 

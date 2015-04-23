@@ -59,6 +59,11 @@ class GroupBy(Operator):
 
   # Iterator abstraction for selection operator.
   def __iter__(self):
+    relId = self.relationId()
+
+    if self.storage.hasRelation(relId):
+      return self.storage.pages(relId);
+  
     self.initializeOutput()
     self.partitionFiles = {}
     self.outputIterator = self.processAllPages()

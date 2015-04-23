@@ -26,6 +26,12 @@ class Select(Operator):
   # Iterator abstraction for selection operator.
 
   def __iter__(self):
+    
+    relId = self.relationId()
+
+    if self.storage.hasRelation(relId):
+      return self.storage.pages(relId);
+    
     self.initializeOutput()
     self.inputIterator = iter(self.subPlan)
     self.inputFinished = False
@@ -71,6 +77,7 @@ class Select(Operator):
     if self.inputIterator is None:
       self.inputIterator = iter(self.subPlan)
 
+    print("Processing " + self.explain());
     # Process all pages from the child operator.
     try:
       for (pageId, page) in self.inputIterator:
@@ -85,6 +92,8 @@ class Select(Operator):
     except StopIteration:
       pass
 
+    print("select estimate card: " + str(self.estimatedCardinality));
+    print("Done with " + self.explain());
     # Return an iterator to the output relation
     return self.storage.pages(self.relationId())
 

@@ -391,8 +391,32 @@ class Optimizer:
   # Returns an optimized query plan with joins ordered via a System-R style
   # dyanmic programming algorithm. The plan cost should be compared with the
   # use of the cost model below.
+  #
+  # helper functions for pickupJoin
+  def isAccessPath(self, operator):
+    if len(operator.inputs()) < 1:
+      return true;
+    elif len(operator.inputs()) == 1:
+      return isAccessPath( operator.subPlan );
+    else:
+      return false;
+  
+  def allAccessPaths(self, operator):
+    totals = Plan(root=operator).flatten();
+    joins  = [j for j in totals if j.operatorType()[-4:] == "Join"];
+    accPs  = [];
+    for j in joins:
+      accPs.append(j.lhsPlan);
+      accPs.append(j.rhsPlan);
+    
+    return [ p for p in accPs if self.isAccessPath(p) ];
+     
   def pickJoinOrder(self, plan):
-    raise NotImplementedError
+    # For this pickJoinOrder we only support plans with all the joins in the 
+    # middle of the tree.
+    # For plans other than these, we con support a partial optimization
+    return allAccessPaths( plan.root );
+    
 
   # Optimize the given query plan, returning the resulting improved plan.
   # This should perform operation pushdown, followed by join order selection.

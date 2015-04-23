@@ -60,7 +60,7 @@ class Operator:
 
   # Returns an identifier for this operator's output relation
   def relationId(self):
-    return "tmp_" + self.operatorType() + "_" + str(self.id());
+    return "tmp_" + self.operatorType() + "_" + str(self.id()) + str(self.opMarker);
 
   # Python implementation of Volcano-style iterator abstraction
   def __iter__(self):
