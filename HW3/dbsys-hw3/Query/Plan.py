@@ -125,9 +125,9 @@ class Plan:
     self.root.useSampling(True, scaleFactor)
     # Process query, update each operator's cost, cardinality, and selectivity estimates.
     for page in self:
-      print( "sampling" );
       for tup in page[1]:
         self.sampleCardinality += 1
+        print( self.root.schema().unpack(tup) );
 
     # Leave the scale factor unchanged, so that we can correctly use estimated statistics after sampling.
     self.root.useSampling(False, scaleFactor)
@@ -292,13 +292,13 @@ class PlanBuilder:
 
   def where(self, conditionExpr):
     if self.operator:
-      return PlanBuilder(operator=Select(self.operator, conditionExpr, pipeline=True), db=self.database)
+      return PlanBuilder(operator=Select(self.operator, conditionExpr), db=self.database)
     else:
       raise ValueError("Invalid where clause")
 
   def select(self, projectExprs):
     if self.operator:
-      return PlanBuilder(operator=Project(self.operator, projectExprs, pipeline=True), db=self.database)
+      return PlanBuilder(operator=Project(self.operator, projectExprs), db=self.database)
     else:
       raise ValueError("Invalid select list")
 

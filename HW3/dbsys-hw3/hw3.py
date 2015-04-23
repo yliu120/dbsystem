@@ -23,8 +23,8 @@ groupKeySchema = DBSchema('groupKey', [('ONE', 'int')]);
 groupAggSchema = DBSchema('groupBy', [('revenue','float')]);
 
 query1 = db.query().fromTable('lineitem').where( \
-            "L_SHIPDATE >= 19940101 and L_SHIPDATE < 19950101 and \
-            0.06 - 0.01 <= L_DISCOUNT <= 0.06 + 0.01 and L_QUANTITY < 24").groupBy( \
+            "(L_SHIPDATE >= 19940101) and (L_SHIPDATE < 19950101) and \
+            (0.06 - 0.01 <= L_DISCOUNT <= 0.06 + 0.01) and (L_QUANTITY < 24)").groupBy( \
             groupSchema=groupKeySchema, \
             aggSchema=groupAggSchema, \
             groupExpr=(lambda e: 1), \

@@ -42,7 +42,6 @@ class Project(Operator):
     self.initializeOutput()
     self.inputIterator = iter(self.subPlan)
     self.inputFinished = False
-
     if not self.pipelined:
       self.outputIterator = self.processAllPages()
 

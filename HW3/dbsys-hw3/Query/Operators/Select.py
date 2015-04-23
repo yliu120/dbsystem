@@ -62,6 +62,7 @@ class Select(Operator):
 
         # Execute the predicate.
         if eval(self.selectExpr, globals(), selectExprEnv):
+          print( self.schema().unpack(inputTuple))
           self.emitOutputTuple(inputTuple)
     else:
       raise ValueError("Overlapping variables detected with operator schema")

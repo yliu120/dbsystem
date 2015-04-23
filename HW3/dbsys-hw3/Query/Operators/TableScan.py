@@ -37,10 +37,13 @@ class TableScan(Operator):
     self.pageIterator = self.storage.pages(self.relId)
     self.nextPageId, self.nextPage = None, None
     self.pageSize, self.numPages, _ = self.storage.relationStats(self.relId)
-
-    p = max(1, self.cardinality(False) / (self.pageSize * self.sampleFactor))
+    self.pageTuples = self.pageSize / self.schema().size;
+    p = max(1, self.cardinality(False) / (self.pageTuples * self.sampleFactor))
     self.sampleSize = p if self.sampled else 0
     self.prevPageIndex, self.pagesToSample = (0, p)
+    
+    self.counter = 0;
+    self.randomNums = sorted( random.sample(range(int(self.numPages)), int(p)) );
     return self
 
   # Table scans are always pipelined.
@@ -48,7 +51,7 @@ class TableScan(Operator):
   # the page-oriented processing style of all operators.
   def __next__(self):
     if self.sampled:
-      return self.sampledOutput()
+      return self.sampledOutput2()
     else:
       return self.nextOutput()
 
@@ -77,6 +80,16 @@ class TableScan(Operator):
         if pr >= random.random():
           pageId, page = None, None
       self.pagesToSample -= 1
+      return (pageId, page)
+    else:
+      raise StopIteration
+  
+  def sampledOutput2(self):
+    if self.counter < self.pagesToSample - 1:
+      pageId, page = self.nextOutput()
+      while( pageId.pageIndex <= self.randomNums[ self.counter ] ):
+        pageId, page = self.nextOutput()
+      self.counter += 1;
       return (pageId, page)
     else:
       raise StopIteration
