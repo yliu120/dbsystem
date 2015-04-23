@@ -289,7 +289,6 @@ class Join(Operator):
 
           if output:
             outputTuple = self.joinSchema.instantiate(*[joinExprEnv[f] for f in self.joinSchema.fields])
-            print( outputTuple );
             self.emitOutputTuple(self.joinSchema.pack(outputTuple))
 
       # No need to track anything but the last output page when in batch mode.
