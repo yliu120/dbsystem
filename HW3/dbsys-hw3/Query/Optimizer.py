@@ -473,6 +473,16 @@ class Optimizer:
   def joinsOptimizer(self, operator, aPaths):
     defaultScaleFactor = 50;
     
+    # i = 1
+    for aPath in aPaths:
+      plan = Plan(root=aPath);
+      cost = plan.sample( defaultScaleFactor );
+      # We define cost here by pages
+      realCost = plan.root.estimatedCardinality * defaultScaleFactor / plan.root.schema().size;
+      self.addPlanCost(plan, realCost);
+    
+    # i = 2...n
+    
     return operator;
   
   # This helper function optimizes a local operator that may contain joins
