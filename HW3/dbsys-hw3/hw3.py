@@ -102,7 +102,7 @@ groupKeySchema = DBSchema('groupKey', [('L_ORDERKEY', 'int'), ('O_ORDERDATE', 'i
 groupAggSchema = DBSchema('groupAgg', [('revenue','float')]);
 
 query3 = db.query().fromTable('customer').join( \
-            db.query().fromTalbe('orders'),
+            db.query().fromTable('orders'),
             method = 'hash', \
             lhsHashFn = 'hash(C_CUSTKEY) % 5', lhsKeySchema = ls1, \
             rhsHashFn = 'hash(O_CUSTKEY) % 5', rhsKeySchema = rs1).join( \

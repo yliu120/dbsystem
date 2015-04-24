@@ -4,53 +4,68 @@ from Catalog.Schema import DBSchema
 db = Database(dataDir='./data');
 
 '''
-SQL Query. Question 2:
-  select part.name, count(*) as count
-   from part, lineitem
-   where part.partkey = lineitem.partkey and lineitem.returnflag = 'R'
-   group by part.name;
-'''
+exp 3
 
-ls1 = DBSchema('partkey1',[('P_PARTKEY', 'int')]);
-rs1 = DBSchema('partkey2',[('L_PARTKEY', 'int')]);
+TPC-H Query 3: a 3-way join and aggregate query
 
-pSchema = db.relationSchema('part');
-lSchema = DBSchema('liselect',[('L_PARTKEY', 'int')]);
-keySchema = DBSchema('groupByKey', [('P_NAME', 'char(55)')]);
-groupBySchema = DBSchema('groupBy', [('count','int')]);
-          
-query = db.query().fromTable('part').join( \
-          db.query().fromTable('lineitem'), \
-          method = 'hash', \
-          lhsHashFn = 'hash(P_PARTKEY) % 2', lhsKeySchema = ls1, \
-          rhsHashFn = 'hash(L_PARTKEY) % 2', rhsKeySchema = rs1).where("L_RETURNFLAG == 'R' and P_PARTKEY > 10").select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')}).groupBy( \
-            groupSchema=keySchema, \
-            aggSchema=groupBySchema, \
-            groupExpr=(lambda e: e.P_NAME), \
-            aggExprs=[(0, lambda acc, e: acc + 1, lambda x: x)], \
-            groupHashFn=(lambda gbVal: hash(gbVal) % 10)).finalize();
+select
+        l_orderkey,
+        sum(l_extendedprice * (1 - l_discount)) as revenue,
+        o_orderdate,
+        o_shippriority
+from
+        customer,
+        orders,
+        lineitem
+where
+        c_mktsegment = 'BUILDING'
+        and c_custkey = o_custkey
+        and l_orderkey = o_orderkey
+        and o_orderdate < 19950315
+        and l_shipdate > 19950315
+group by
+        l_orderkey,
+        o_orderdate,
+        o_shippriority
+'''
+ls1 = DBSchema('customerKey1', [('C_CUSTKEY', 'int')]);
+rs1 = DBSchema('customerKey2', [('O_CUSTKEY', 'int')]);
 
-queryOpt = db.optimizer.optimizeQuery( query );
-'''
-groupKeySchema = DBSchema('groupKey', [('ONE', 'int')]);
-groupAggSchema = DBSchema('groupBy', [('revenue','float')]);
+ls2 = DBSchema('orderKey1', [('O_ORDERKEY', 'int')]);
+rs2 = DBSchema('orderkey2', [('L_ORDERKEY', 'int')]);
 
-query2 = db.query().fromTable('part').where("P_SIZE > 20").select( \
-           {'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('P_PARTKEY', 'int')} ).where("P_PARTKEY > 10000").select(
-              {'P_NAME': ('P_NAME', 'char(55)') }).finalize();
-query2opt = db.optimizer.pushdownOperators( query2 );
-'''
-print( queryOpt.explain() );
+groupKeySchema = DBSchema('groupKey', [('L_ORDERKEY', 'int'), ('O_ORDERDATE', 'int'), ('O_SHIPPRIORITY', 'int')]);
+groupAggSchema = DBSchema('groupAgg', [('revenue','float')]);
 
-'''
-query3 = db.query().fromTable('part').join( \
-          db.query().fromTable('lineitem'), \
-          method = 'hash', \
-          lhsHashFn = 'hash(P_PARTKEY) % 4', lhsKeySchema = ls1, \
-          rhsHashFn = 'hash(L_PARTKEY) % 4', rhsKeySchema = rs1).where("L_RETURNFLAG == 'R' and P_PARTKEY > 10000").finalize();
-'''
-# queryTest = db.query().fromTable('part').select({'P_NAME': ('P_NAME', 'char(55)'), 'P_PARTKEY': ('(P_PARTKEY+1)', 'int')}).finalize();
-    
+query3 = db.query().fromTable('customer').join( \
+            db.query().fromTable('orders'),
+            method = 'hash', \
+            lhsHashFn = 'hash(C_CUSTKEY) % 5', lhsKeySchema = ls1, \
+            rhsHashFn = 'hash(O_CUSTKEY) % 5', rhsKeySchema = rs1).join( \
+            db.query().fromTable('lineitem'),
+            method = 'hash', \
+            lhsHashFn = 'hash(O_ORDERKEY) % 5', lhsKeySchema = ls2, \
+            rhsHashFn = 'hash(L_ORDERKEY) % 5', rhsKeySchema = rs2).where( \
+            "C_MKTSEGMENT = 'BUILDING' and O_ORDERDATE < 19950315 and L_SHIPDATE > 19950315").groupBy( \
+            groupSchema=groupKeySchema, \
+            aggSchema=groupAggSchema, \
+            groupExpr=(lambda e: (e.L_ORDERKEY, e.O_ORDERDATE, e.O_SHIPPRIORITY)), \
+            aggExprs=[(0, lambda acc, e: acc + (e.L_EXTENDEDPRICE * (1 - e.L_DISCOUNT)), lambda x: x)], \
+            groupHashFn=(lambda gbVal: hash(gbVal) % 10)).select( \
+            {'l_orderkey' : ('L_ORDERKEY', 'int'), \
+             'revenue' : ('revenue', 'float'), \
+             'o_orderdate' : ('O_ORDERDATE', 'int'), \
+             'o_shippriority' : ('O_SHIPPRIORITY', 'int')}).finalize();
+
+print( query3.explain() );
+             
+query3PD = db.optimizer.pushdownOperators( query3 );
+
+print( query3PD.explain() );
+
+
+
+  
 #for page in db.processQuery( query1 ):
 #    for tup in page[1]:
 #        print( query1.schema().unpack(tup) );
