@@ -469,9 +469,32 @@ class Optimizer:
     else:
       raise ValueError("Empty plan cannot be decoded.");
   
+  # This function returns a list of joinExprs
+  # Here we prefered joinExprs in form of (a, b).
+  def decodeJoinExprs(self, operator):
+    lst = [];
+    if self.isUnaryPath(operator):
+      return lst;
+    else:
+      if operator.operatorType()[-4:] == "Join":
+        # The Join type we support:
+        # "nested-loops", "block-nested-loops", "hash"
+        # indexed join cannot work.
+        if operator.joinMethod == "nested-loops" or operator.joinMethod == "block-nested-loops":
+          lst.append( tuple( ExpressionInfo(operator.joinExpr).decomposeCNF() ) );
+        elif operator.joinMethod == "hash":
+          lst.append( (operator.lhsKeySchema.fields[0], operator.rhsKeySchema.fields[0]) );
+        else:
+          raise ValueError("Join method not supported by the optimizer");
+        lst += self.decodeJoinExprs( operator.lhsPlan );
+        lst += self.decodeJoinExprs( operator.rhsPlan );
+      
+      return lst;
+      
   # Our main algorithm - system R optimizer
   def joinsOptimizer(self, operator, aPaths):
     defaultScaleFactor = 50;
+    # build join constraint list;
     
     # i = 1
     for aPath in aPaths:
