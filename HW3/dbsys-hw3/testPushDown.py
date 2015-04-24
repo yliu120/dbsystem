@@ -30,7 +30,7 @@ query = db.query().fromTable('part').join( \
             aggExprs=[(0, lambda acc, e: acc + 1, lambda x: x)], \
             groupHashFn=(lambda gbVal: hash(gbVal) % 10)).finalize();
 
-queryOpt = db.optimizer.pushdownOperators( query );
+queryOpt = db.optimizer.optimizeQuery( query );
 '''
 groupKeySchema = DBSchema('groupKey', [('ONE', 'int')]);
 groupAggSchema = DBSchema('groupBy', [('revenue','float')]);
@@ -41,12 +41,6 @@ query2 = db.query().fromTable('part').where("P_SIZE > 20").select( \
 query2opt = db.optimizer.pushdownOperators( query2 );
 '''
 print( queryOpt.explain() );
-queryOpt.sample( 50 );
-print( queryOpt.explain() );
-
-for page in db.processQuery( queryOpt ):
-    for tup in page[1]:
-        print( queryOpt.schema().unpack(tup) );
 
 '''
 query3 = db.query().fromTable('part').join( \

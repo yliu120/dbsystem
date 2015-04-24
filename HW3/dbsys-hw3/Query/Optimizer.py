@@ -45,14 +45,36 @@ class Optimizer:
 
   # Caches the cost of a plan computed during query optimization.
   def addPlanCost(self, plan, cost):
-    self.statsCache[ plan ] = cost;
+    if plan.root and plan.root.operatorType()[-4:] == "Join":
+      decoder = self.decodeJoins(plan.root);
+      sortDec = tuple( sorted( list(map(lambda x : x.relId(), decoder)) ) );
+      if sortDec in self.statsCache:
+        (_, c) = self.statsCache[sortDec];
+        if cost < c:
+          self.statsCache[sortDec] = (plan, cost);
+      else:
+        self.statsCache[sortDec] = (plan, cost);
+    elif plan.root and plan.root.operatorType()[-4:] != "Join":
+      self.statsCache[plan.root.relId()] = cost;
+    else:
+      raise ValueError("Empty Plan!");
 
   # Checks if we have already computed the cost of this plan.
   def getPlanCost(self, plan):
-    if (plan in self.statsCache):
-      return self.statsCache[ plan ];
+    if plan.root and plan.root.operatorType()[-4:] == "Join":
+      decoder = self.decodeJoins(plan.root);
+      sortDec = tuple( sorted( list(map(lambda x : x.relId(), decoder)) ) );
+      if sortDec in self.statsCache:
+        return self.statsCache[ sortDec ];
+      else:
+        raise ValueError("No such plan cached.");
+    elif plan.root and plan.root.operatorType()[-4:] != "Join":
+      if plan.root.relId() in self.statsCache:
+        return self.statsCache[plan.root.relId()];
+      else:
+        raise ValueError("No such plan cached.");
     else:
-      raise ValueError("No such plan cached.");
+      raise ValueError("Input empty plan");
 
   # Given a plan, return an optimized plan with both selection and
   # projection operations pushed down to their nearest defining relation
@@ -431,8 +453,26 @@ class Optimizer:
     else:
       return false;
   
+  # This is an internal function serving as decoding left-deep-joins to
+  # (t1 t2) t3 --> [t1, t2, t3]
+  def decodeJoins(self, operator):
+    if operator:
+      lst = [];
+      if operator.operatorType()[-4:] == "Join":
+        if operator.lhsPlan.operatorType()[-4:] == "Join":
+          lst.append(self.decodeJoins(operator.lhsPlan));
+          lst.append(operator.rhsPlan);
+        else: 
+          lst.append(operator.lhsPlan);
+          lst.append(operator.rhsPlan);
+        return lst;
+    else:
+      raise ValueError("Empty plan cannot be decoded.");
+  
   # Our main algorithm - system R optimizer
   def joinsOptimizer(self, operator, aPaths):
+    defaultScaleFactor = 50;
+    
     return operator;
   
   # This helper function optimizes a local operator that may contain joins
