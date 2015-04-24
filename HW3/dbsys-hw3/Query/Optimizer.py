@@ -471,31 +471,44 @@ class Optimizer:
   
   # This function returns a list of joinExprs
   # Here we prefered joinExprs in form of (a, b).
-  def decodeJoinExprs(self, operator):
-    lst = [];
+  def decodeJoinExprs(self, operator, aPaths):
+    d = dict();
     if self.isUnaryPath(operator):
-      return lst;
+      return d;
     else:
       if operator.operatorType()[-4:] == "Join":
         # The Join type we support:
         # "nested-loops", "block-nested-loops", "hash"
         # indexed join cannot work.
         if operator.joinMethod == "nested-loops" or operator.joinMethod == "block-nested-loops":
-          lst.append( tuple( ExpressionInfo(operator.joinExpr).decomposeCNF() ) );
+          key = tuple( ExpressionInfo(operator.joinExpr).decomposeCNF() );
         elif operator.joinMethod == "hash":
-          lst.append( (operator.lhsKeySchema.fields[0], operator.rhsKeySchema.fields[0]) );
+          key = (operator.lhsKeySchema.fields[0], operator.rhsKeySchema.fields[0]);
         else:
           raise ValueError("Join method not supported by the optimizer");
-        lst += self.decodeJoinExprs( operator.lhsPlan );
-        lst += self.decodeJoinExprs( operator.rhsPlan );
       
-      return lst;
+        if key not in d:
+          d[key] = [];
+          
+        if operator.lhsPlan in aPaths:
+          d[key].append( operator.lhsPlan );
+        if operator.rhsPlan in aPaths:
+          d[key].append( operator.rhsPlan );
+            
+        
+        d1 = d.update( self.decodeJoinExprs( operator.lhsPlan, aPaths ) );
+        d2 = d1.update( self.decodeJoinExprs(operator.rhsPlan, aPaths ) );
+      
+      return d2;
       
   # Our main algorithm - system R optimizer
+  # Here we buildup optimized plan iteratively.
   def joinsOptimizer(self, operator, aPaths):
     defaultScaleFactor = 50;
     # build join constraint list;
-    
+    joinExprs = self.decodeJoinExprs(operator, aPaths);
+    # build a local plan-cost dict:
+    prev      = dict();
     # i = 1
     for aPath in aPaths:
       plan = Plan(root=aPath);
@@ -503,6 +516,7 @@ class Optimizer:
       # We define cost here by pages
       realCost = plan.root.estimatedCardinality * defaultScaleFactor / plan.root.schema().size;
       self.addPlanCost(plan, realCost);
+      prev[plan] = realCost;
     
     # i = 2...n
     
