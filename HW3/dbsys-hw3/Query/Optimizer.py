@@ -523,60 +523,64 @@ class Optimizer:
       prev[aPlan] = (numPages, 0);
     # i = 2...n
     for i in range(1, n):
-        # build current list with prev.
-        # For 2-way joins, we don't need to care left deep plan
-        for p in prev.keys():
-          accP = self.decodeJoins(p);
-          remL = [item for item in aPaths if item not in accP];
-          for base in remL:
-            lhsSchema = p.schema();
-            rhsSchema = base.schema();
-            newJoin   = None;
-            (lPlan, (sCostL, tCostL)) = self.getPlanCost(p);
-            (rPlan, (sCostR, tCostR)) = self.getPlanCost(base);
-            # Here we are using System-R 's heuristic to eliminate permutations as
-            # much as possible.
-            # Reference: Selinger, 1979, http://www.cs.berkeley.edu/~brewer/cs262/3-selinger79.pdf
-            for (lField, rField) in joinExprs:
-              if lField in lhsSchema.fields and rField in rhsSchema.fields:
-                # Build Join
-                # We only select hashjoin for building join plans
-                # This is because the nested-loop-join contains a bug
-                lKeySchema = DBSchema('left', [(f, t) for (f, t) in lhsSchema.schema() if f == lField]);
-                rKeySchema = DBSchema('right', [(f, t) for (f, t) in rhsSchema.schema() if f == rField]);
-                lHashFn    = 'hash(' + lField + ') % ' + str(defaultPartiNumber);
-                rHashFn    = 'hash(' + rField + ') % ' + str(defaultPartiNumber);
-                newJoin    = Join(lPlan, rPlan, method = 'hash', \
-                                  lhsHashFn = lHashFn, lhsKeySchema = lKeySchema, \
-                                  rhsHashFn = rHashFn, rhsKeySchema = rKeySchema)
+      # build current list with prev.
+      # For 2-way joins, we don't need to care left deep plan
+      for p in prev.keys():
+        accP = self.decodeJoins(p);
+        remL = [item for item in aPaths if item not in accP];
+        for base in remL:
+          lhsSchema = p.schema();
+          rhsSchema = base.schema();
+          newJoin = None;
+          (sCostL, tCostL) = prev[p];
+          (rPlan, (sCostR, tCostR)) = self.getPlanCost(base);
+          # Here we are using System-R 's heuristic to eliminate permutations as
+          # much as possible.
+          # Reference: Selinger, 1979, http://www.cs.berkeley.edu/~brewer/cs262/3-selinger79.pdf
+          for (lField, rField) in joinExprs:
+            if lField in lhsSchema.fields and rField in rhsSchema.fields:
+              # Build Join
+              # We only select hashjoin for building join plans
+              # This is because the nested-loop-join contains a bug
+              lKeySchema = DBSchema('left', [(f, t) for (f, t) in lhsSchema.schema() if f == lField]);
+              rKeySchema = DBSchema('right', [(f, t) for (f, t) in rhsSchema.schema() if f == rField]);
+              lHashFn = 'hash(' + lField + ') % ' + str(defaultPartiNumber);
+              rHashFn = 'hash(' + rField + ') % ' + str(defaultPartiNumber);
+              newJoin = Join(lPlan, rPlan, method='hash', \
+                             lhsHashFn=lHashFn, lhsKeySchema=lKeySchema, \
+                             rhsHashFn=rHashFn, rhsKeySchema=rKeySchema)
                   
-              elif lField in rhsSchema.fields and rField in lhsSchema.fields:
-                # Build Join
-                # We only select hashjoin for building join plans
-                # This is because the nested-loop-join contains a bug
-                lKeySchema = DBSchema('left', [(f, t) for (f, t) in rhsSchema.schema() if f == lField]);
-                rKeySchema = DBSchema('right', [(f, t) for (f, t) in lhsSchema.schema() if f == rField]);
-                lHashFn    = 'hash(' + rField + ') % ' + str(defaultPartiNumber);
-                rHashFn    = 'hash(' + lField + ') % ' + str(defaultPartiNumber);
-                newJoin    = Join(lPlan, rPlan, method = 'hash', \
-                                  lhsHashFn = lHashFn, lhsKeySchema = rKeySchema, \
-                                  rhsHashFn = rHashFn, rhsKeySchema = lKeySchema)
-              else:
-                continue;
+            elif lField in rhsSchema.fields and rField in lhsSchema.fields:
+              # Build Join
+              # We only select hashjoin for building join plans
+              # This is because the nested-loop-join contains a bug
+              lKeySchema = DBSchema('left', [(f, t) for (f, t) in rhsSchema.schema() if f == lField]);
+              rKeySchema = DBSchema('right', [(f, t) for (f, t) in lhsSchema.schema() if f == rField]);
+              lHashFn = 'hash(' + rField + ') % ' + str(defaultPartiNumber);
+              rHashFn = 'hash(' + lField + ') % ' + str(defaultPartiNumber);
+              newJoin = Join(lPlan, rPlan, method='hash', \
+                             lhsHashFn=lHashFn, lhsKeySchema=rKeySchema, \
+                             rhsHashFn=rHashFn, rhsKeySchema=lKeySchema)
+            else:
+              continue;
               
-              if newJoin is not None:
-                # Let's push newJoin onto the cache and curr list
-                # cost: 3(M+N) + M's totalcost
-                # then we renew newJoin's stepcost
-                newJoin.storage  = storage;
-                stepCost = 3 * (sCostL + sCostR);
-                totalCost = stepCost + tCostL;
-                pages = Plan(root=newJoin).sample() / newJoin.schema().size;
-                self.addPlanCost(newJoin, (pages, totalCost));
-                curr[newJoin] = (pages, totalCost);
+            if newJoin is not None:
+              # Let's push newJoin onto the cache and curr list
+              # cost: 3(M+N) + M's totalcost
+              # then we renew newJoin's stepcost
+              newJoin.storage = storage;
+              stepCost = 3 * (sCostL + sCostR);
+              totalCost = stepCost + tCostL;
+              pages = Plan(root=newJoin).sample() / newJoin.schema().size;
+              self.addPlanCost(newJoin, (pages, totalCost));
+              curr[newJoin] = (pages, totalCost);
                   
-                
-    return operator;
+      prev = curr;
+      curr = dict();
+           
+    del prev, curr;
+         
+    return self.getPlanCost(operator)[0];
   
   # This helper function optimizes a local operator that may contain joins
   def optimizeJoins(self, operator):
