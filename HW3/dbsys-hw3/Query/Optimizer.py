@@ -44,33 +44,43 @@ class Optimizer:
     self.statsCache = {}
 
   # Caches the cost of a plan computed during query optimization.
+  # note that here plan is an operator
+  # same as getPlanCost
+  # Here we utilized a correct cost model
+  # For each join plan:
+  # (AB)C, when we calculate the total cost of this join,
+  # we use (AB)'s step cost and C's step cost to compute (AB)C's step cost
+  # However, for (AB)C's total cost = (AB)C 's step cost + (AB) 's total cost
+  # Then we renew (AB)C's step cost to the correct form - the output pages num.
+  # This is what we do in the joinsOptimizer() function as well.
+  # Therefore, for each plan, our cost is a tuple (stepcost, totalcost)
   def addPlanCost(self, plan, cost):
-    if plan.root and plan.root.operatorType()[-4:] == "Join":
-      decoder = self.decodeJoins(plan.root);
+    if plan and plan.operatorType()[-4:] == "Join":
+      decoder = self.decodeJoins(plan);
       sortDec = tuple( sorted( list(map(lambda x : x.relId(), decoder)) ) );
       if sortDec in self.statsCache:
         (_, c) = self.statsCache[sortDec];
-        if cost < c:
+        if cost[1] < c[1]:
           self.statsCache[sortDec] = (plan, cost);
       else:
         self.statsCache[sortDec] = (plan, cost);
-    elif plan.root and plan.root.operatorType()[-4:] != "Join":
-      self.statsCache[plan.root.relId()] = cost;
+    elif plan and plan.operatorType()[-4:] != "Join":
+      self.statsCache[plan.relId()] = cost;
     else:
       raise ValueError("Empty Plan!");
 
   # Checks if we have already computed the cost of this plan.
   def getPlanCost(self, plan):
-    if plan.root and plan.root.operatorType()[-4:] == "Join":
-      decoder = self.decodeJoins(plan.root);
+    if plan and plan.operatorType()[-4:] == "Join":
+      decoder = self.decodeJoins(plan);
       sortDec = tuple( sorted( list(map(lambda x : x.relId(), decoder)) ) );
       if sortDec in self.statsCache:
         return self.statsCache[ sortDec ];
       else:
         raise ValueError("No such plan cached.");
-    elif plan.root and plan.root.operatorType()[-4:] != "Join":
-      if plan.root.relId() in self.statsCache:
-        return self.statsCache[plan.root.relId()];
+    elif plan and plan.operatorType()[-4:] != "Join":
+      if plan.relId() in self.statsCache:
+        return self.statsCache[plan.relId()];
       else:
         raise ValueError("No such plan cached.");
     else:
@@ -471,55 +481,101 @@ class Optimizer:
   
   # This function returns a list of joinExprs
   # Here we prefered joinExprs in form of (a, b).
-  def decodeJoinExprs(self, operator, aPaths):
-    d = dict();
+  def decodeJoinExprs(self, operator):
+    lst = [];
     if self.isUnaryPath(operator):
-      return d;
+      return lst;
     else:
       if operator.operatorType()[-4:] == "Join":
         # The Join type we support:
         # "nested-loops", "block-nested-loops", "hash"
         # indexed join cannot work.
         if operator.joinMethod == "nested-loops" or operator.joinMethod == "block-nested-loops":
-          key = tuple( ExpressionInfo(operator.joinExpr).decomposeCNF() );
+          lst.append( tuple( ExpressionInfo(operator.joinExpr).decomposeCNF() ) );
         elif operator.joinMethod == "hash":
-          key = (operator.lhsKeySchema.fields[0], operator.rhsKeySchema.fields[0]);
+          lst.append( (operator.lhsKeySchema.fields[0], operator.rhsKeySchema.fields[0]) );
         else:
           raise ValueError("Join method not supported by the optimizer");
+        lst += self.decodeJoinExprs( operator.lhsPlan );
+        lst += self.decodeJoinExprs( operator.rhsPlan );
       
-        if key not in d:
-          d[key] = [];
-          
-        if operator.lhsPlan in aPaths:
-          d[key].append( operator.lhsPlan );
-        if operator.rhsPlan in aPaths:
-          d[key].append( operator.rhsPlan );
-            
-        
-        d1 = d.update( self.decodeJoinExprs( operator.lhsPlan, aPaths ) );
-        d2 = d1.update( self.decodeJoinExprs(operator.rhsPlan, aPaths ) );
-      
-      return d2;
+      return lst;
       
   # Our main algorithm - system R optimizer
   # Here we buildup optimized plan iteratively.
   def joinsOptimizer(self, operator, aPaths):
     defaultScaleFactor = 50;
+    defaultPartiNumber = 5;
+    storage            = operator.storage;
     # build join constraint list;
-    joinExprs = self.decodeJoinExprs(operator, aPaths);
+    joinExprs = self.decodeJoinExprs(operator);
     # build a local plan-cost dict:
     prev      = dict();
+    curr      = dict();
+    n         = len(aPaths);
     # i = 1
     for aPath in aPaths:
-      plan = Plan(root=aPath);
-      cost = plan.sample( defaultScaleFactor );
-      # We define cost here by pages
-      realCost = plan.root.estimatedCardinality * defaultScaleFactor / plan.root.schema().size;
-      self.addPlanCost(plan, realCost);
-      prev[plan] = realCost;
-    
+      # Here we define cost by number of pages.
+      numPages = Plan(root=aPath).sample( defaultScaleFactor ) / aPath.schema().size;
+      # Here we only consider reorganize joins
+      # so that we simple put accessPaths' totalcost as 0.
+      self.addPlanCost(aPlan, (numPages, 0));
+      prev[aPlan] = (numPages, 0);
     # i = 2...n
-    
+    for i in range(1, n):
+        # build current list with prev.
+        # For 2-way joins, we don't need to care left deep plan
+        for p in prev.keys():
+          accP = self.decodeJoins(p);
+          remL = [item for item in aPaths if item not in accP];
+          for base in remL:
+            lhsSchema = p.schema();
+            rhsSchema = base.schema();
+            newJoin   = None;
+            (lPlan, (sCostL, tCostL)) = self.getPlanCost(p);
+            (rPlan, (sCostR, tCostR)) = self.getPlanCost(base);
+            # Here we are using System-R 's heuristic to eliminate permutations as
+            # much as possible.
+            # Reference: Selinger, 1979, http://www.cs.berkeley.edu/~brewer/cs262/3-selinger79.pdf
+            for (lField, rField) in joinExprs:
+              if lField in lhsSchema.fields and rField in rhsSchema.fields:
+                # Build Join
+                # We only select hashjoin for building join plans
+                # This is because the nested-loop-join contains a bug
+                lKeySchema = DBSchema('left', [(f, t) for (f, t) in lhsSchema.schema() if f == lField]);
+                rKeySchema = DBSchema('right', [(f, t) for (f, t) in rhsSchema.schema() if f == rField]);
+                lHashFn    = 'hash(' + lField + ') % ' + str(defaultPartiNumber);
+                rHashFn    = 'hash(' + rField + ') % ' + str(defaultPartiNumber);
+                newJoin    = Join(lPlan, rPlan, method = 'hash', \
+                                  lhsHashFn = lHashFn, lhsKeySchema = lKeySchema, \
+                                  rhsHashFn = rHashFn, rhsKeySchema = rKeySchema)
+                  
+              elif lField in rhsSchema.fields and rField in lhsSchema.fields:
+                # Build Join
+                # We only select hashjoin for building join plans
+                # This is because the nested-loop-join contains a bug
+                lKeySchema = DBSchema('left', [(f, t) for (f, t) in rhsSchema.schema() if f == lField]);
+                rKeySchema = DBSchema('right', [(f, t) for (f, t) in lhsSchema.schema() if f == rField]);
+                lHashFn    = 'hash(' + rField + ') % ' + str(defaultPartiNumber);
+                rHashFn    = 'hash(' + lField + ') % ' + str(defaultPartiNumber);
+                newJoin    = Join(lPlan, rPlan, method = 'hash', \
+                                  lhsHashFn = lHashFn, lhsKeySchema = rKeySchema, \
+                                  rhsHashFn = rHashFn, rhsKeySchema = lKeySchema)
+              else:
+                continue;
+              
+              if newJoin is not None:
+                # Let's push newJoin onto the cache and curr list
+                # cost: 3(M+N) + M's totalcost
+                # then we renew newJoin's stepcost
+                newJoin.storage  = storage;
+                stepCost = 3 * (sCostL + sCostR);
+                totalCost = stepCost + tCostL;
+                pages = Plan(root=newJoin).sample() / newJoin.schema().size;
+                self.addPlanCost(newJoin, (pages, totalCost));
+                curr[newJoin] = (pages, totalCost);
+                  
+                
     return operator;
   
   # This helper function optimizes a local operator that may contain joins

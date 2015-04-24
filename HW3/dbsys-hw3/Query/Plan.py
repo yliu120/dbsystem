@@ -127,7 +127,6 @@ class Plan:
     for page in self:
       for tup in page[1]:
         self.sampleCardinality += 1
-        print( self.root.schema().unpack(tup) );
 
     # Leave the scale factor unchanged, so that we can correctly use estimated statistics after sampling.
     self.root.useSampling(False, scaleFactor)
