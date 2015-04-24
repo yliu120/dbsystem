@@ -46,7 +46,7 @@ query3 = db.query().fromTable('customer').join( \
             method = 'hash', \
             lhsHashFn = 'hash(O_ORDERKEY) % 5', lhsKeySchema = ls2, \
             rhsHashFn = 'hash(L_ORDERKEY) % 5', rhsKeySchema = rs2).where( \
-            "C_MKTSEGMENT = 'BUILDING' and O_ORDERDATE < 19950315 and L_SHIPDATE > 19950315").groupBy( \
+            "(C_MKTSEGMENT == 'BUILDING') and (O_ORDERDATE < 19950315) and (L_SHIPDATE > 19950315)").groupBy( \
             groupSchema=groupKeySchema, \
             aggSchema=groupAggSchema, \
             groupExpr=(lambda e: (e.L_ORDERKEY, e.O_ORDERDATE, e.O_SHIPPRIORITY)), \

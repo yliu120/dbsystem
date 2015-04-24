@@ -110,7 +110,7 @@ query3 = db.query().fromTable('customer').join( \
             method = 'hash', \
             lhsHashFn = 'hash(O_ORDERKEY) % 5', lhsKeySchema = ls2, \
             rhsHashFn = 'hash(L_ORDERKEY) % 5', rhsKeySchema = rs2).where( \
-            "C_MKTSEGMENT = 'BUILDING' and O_ORDERDATE < 19950315 and L_SHIPDATE > 19950315").groupBy( \
+            "C_MKTSEGMENT == 'BUILDING' and O_ORDERDATE < 19950315 and L_SHIPDATE > 19950315").groupBy( \
             groupSchema=groupKeySchema, \
             aggSchema=groupAggSchema, \
             groupExpr=(lambda e: (e.L_ORDERKEY, e.O_ORDERDATE, e.O_SHIPPRIORITY)), \
@@ -183,7 +183,7 @@ query4 = db.query().fromTable('customer').join( \
             method = 'hash', \
             lhsHashFn = 'hash(C_NATIONKEY) % 5', lhsKeySchema = ls3, \
             rhsHashFn = 'hash(N_NATIONKEY) % 5', rhsKeySchema = rs3).where( \
-            "L_RETURNFLAG = 'R' and O_ORDERDATE < 19940101 and O_ORDERDATE >= 19931001").groupBy( \
+            "L_RETURNFLAG == 'R' and O_ORDERDATE < 19940101 and O_ORDERDATE >= 19931001").groupBy( \
             groupSchema=groupKeySchema, \
             aggSchema=groupAggSchema, \
             groupExpr=(lambda e: (e.C_CUSTKEY, e.C_NAME, e.C_ACCTBAL, e.C_PHONE, e.N_NAME, e.C_ADDRESS, e.C_COMMENT)), \
@@ -266,7 +266,7 @@ query5 = db.query().fromTable('customer').join( \
             method = 'hash', \
             lhsHashFn = 'hash(N_REGIONKEY) % 5', lhsKeySchema = ls5, \
             rhsHashFn = 'hash(R_REGIONKEY) % 5', rhsKeySchema = rs5).where( \
-            "R_NAME = 'ASIA' and O_ORDERDATE >= 19940101 and O_ORDERDATE < 19950101").groupBy( \
+            "R_NAME == 'ASIA' and O_ORDERDATE >= 19940101 and O_ORDERDATE < 19950101").groupBy( \
             groupSchema=groupKeySchema, \
             aggSchema=groupAggSchema, \
             groupExpr=(lambda e: e.N_NAME), \
