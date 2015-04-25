@@ -17,15 +17,15 @@ class DBFileSystemGC:
   
   @staticmethod
   def gc(opMarker=None, db=None):
-    fileNames = DBFileSystemGC.list_files(defaultDBPath);
+    fileNames = DBFileSystemGC.list_files(DBFileSystemGC.defaultDBPath);
 
     for file in fileNames:
-      fName = defaultDBPath + '/' + file;
+      fName = DBFileSystemGC.defaultDBPath + '/' + file;
       f = open(fName, 'r');
       f.close(); 
     
     if db == None:
-      db = Database(dataDir=defaultDBPath);
+      db = Database(dataDir=DBFileSystemGC.defaultDBPath);
       
     if opMarker == None:
       opMarker = "";
