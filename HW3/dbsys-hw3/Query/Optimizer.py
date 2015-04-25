@@ -57,7 +57,7 @@ class Optimizer:
   def addPlanCost(self, plan, cost):
     if plan and plan.operatorType()[-4:] == "Join":
       decoder = self.decodeJoins(plan);
-      sortDec = tuple( sorted( list(map(lambda x : x.id(), decoder)) ) );
+      sortDec = tuple( sorted( list( map(lambda x : x.id(), decoder)) ) );
       if sortDec in self.statsCache:
         (_, c) = self.statsCache[sortDec];
         if cost[1] < c[1]:
@@ -468,7 +468,7 @@ class Optimizer:
       lst = [];
       if operator.operatorType()[-4:] == "Join":
         if operator.lhsPlan.operatorType()[-4:] == "Join":
-          lst.append(self.decodeJoins(operator.lhsPlan));
+          lst += self.decodeJoins(operator.lhsPlan);
           lst.append(operator.rhsPlan);
         else: 
           lst.append(operator.lhsPlan);
