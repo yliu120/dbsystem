@@ -1,7 +1,4 @@
-from Database import Database
-from Catalog.Schema import DBSchema
 import os;
-
 
 class DBFileSystemGC:
   
