@@ -59,7 +59,7 @@ query3 = db.query().fromTable('customer').join( \
 
 print( query3.explain() );
              
-query3PD = db.optimizer.pickJoinOrder( query3 );
+query3PD = db.optimizer.optimizeQuery( query3 );
 
 print( query3PD.explain() );
 

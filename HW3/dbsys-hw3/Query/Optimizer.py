@@ -65,7 +65,7 @@ class Optimizer:
       else:
         self.statsCache[sortDec] = (plan, cost);
     elif plan and plan.operatorType()[-4:] != "Join":
-      self.statsCache[plan.id()] = cost;
+      self.statsCache[plan.id()] = (plan, cost);
     else:
       raise ValueError("Empty Plan!");
 
@@ -531,7 +531,7 @@ class Optimizer:
           rhsSchema = base.schema();
           newJoin = None;
           (sCostL, tCostL) = prev[p];
-          (rPlan, (sCostR, tCostR)) = self.getPlanCost(base);
+          (rPlan, costR) = self.getPlanCost(base);
           # Here we are using System-R 's heuristic to eliminate permutations as
           # much as possible.
           # Reference: Selinger, 1979, http://www.cs.berkeley.edu/~brewer/cs262/3-selinger79.pdf
@@ -544,7 +544,7 @@ class Optimizer:
               rKeySchema = DBSchema('right', [(f, t) for (f, t) in rhsSchema.schema() if f == rField]);
               lHashFn = 'hash(' + lField + ') % ' + str(defaultPartiNumber);
               rHashFn = 'hash(' + rField + ') % ' + str(defaultPartiNumber);
-              newJoin = Join(lPlan, rPlan, method='hash', \
+              newJoin = Join(p, rPlan, method='hash', \
                              lhsHashFn=lHashFn, lhsKeySchema=lKeySchema, \
                              rhsHashFn=rHashFn, rhsKeySchema=rKeySchema)
                   
@@ -556,7 +556,7 @@ class Optimizer:
               rKeySchema = DBSchema('right', [(f, t) for (f, t) in lhsSchema.schema() if f == rField]);
               lHashFn = 'hash(' + rField + ') % ' + str(defaultPartiNumber);
               rHashFn = 'hash(' + lField + ') % ' + str(defaultPartiNumber);
-              newJoin = Join(lPlan, rPlan, method='hash', \
+              newJoin = Join(p, rPlan, method='hash', \
                              lhsHashFn=lHashFn, lhsKeySchema=rKeySchema, \
                              rhsHashFn=rHashFn, rhsKeySchema=lKeySchema)
             else:
@@ -567,9 +567,9 @@ class Optimizer:
               # cost: 3(M+N) + M's totalcost
               # then we renew newJoin's stepcost
               newJoin.storage = storage;
-              stepCost = 3 * (sCostL + sCostR);
+              stepCost = 3 * (sCostL + costR[0]);
               totalCost = stepCost + tCostL;
-              pages = Plan(root=newJoin).sample() / newJoin.schema().size;
+              pages = Plan(root=newJoin).sample( defaultScaleFactor ) / newJoin.schema().size;
               self.addPlanCost(newJoin, (pages, totalCost));
               curr[newJoin] = (pages, totalCost);
                   
