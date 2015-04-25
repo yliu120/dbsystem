@@ -8,6 +8,8 @@ from Query.Operators.Select import Select
 from Utils.ExpressionInfo import ExpressionInfo
 from Catalog.Schema import DBSchema
 
+from DBFileSystemGC import DBFileSystemGC
+
 class Optimizer:
   """
   A query optimization class.
@@ -621,7 +623,10 @@ class Optimizer:
   def optimizeQuery(self, plan):
     pushedDown_plan = self.pushdownOperators(plan)
     joinPicked_plan = self.pickJoinOrder(pushedDown_plan)
-
+    
+    joinPicked_plan.prepare( self.db );
+    # deleting all the sampling tmp files
+    DBFileSystemGC.gc(db=self.db);
     return joinPicked_plan
 
 if __name__ == "__main__":
