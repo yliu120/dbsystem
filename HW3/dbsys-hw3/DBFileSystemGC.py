@@ -5,6 +5,7 @@ class DBFileSystemGC:
   
   defaultDBPath = './data';
   # close all the files in that directory.
+  @staticmethod
   def list_files(path):
     # returns a list of names (with extension, without full path) of all files 
     # in folder path
@@ -14,7 +15,8 @@ class DBFileSystemGC:
         files.append(name)
     return files 
   
-  def gc(self, opMarker=None, db=None):
+  @staticmethod
+  def gc(opMarker=None, db=None):
     fileNames = self.list_files(defaultDBPath);
 
     for file in fileNames:
