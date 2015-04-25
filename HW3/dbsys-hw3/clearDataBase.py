@@ -21,8 +21,8 @@ for file in fileNames:
   
 db = Database(dataDir='./data');
 
-tmpRel = list( db.relations() );
+tmpRel = list( db.storage.fileMgr.relations() );
 for relKey in tmpRel:
   if relKey.startswith('tmp'):
-    db.removeRelation( relKey );
+    db.storage.fileMgr.removeRelation( relKey );
   
