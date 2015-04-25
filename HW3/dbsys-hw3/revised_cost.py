@@ -1,4 +1,5 @@
 import math
+
 class Join:
   def localCost(self, estimated):
     numInputs = sum(map(lambda x: x.cardinality(estimated), self.inputs()));

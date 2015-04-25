@@ -57,7 +57,7 @@ class Optimizer:
   def addPlanCost(self, plan, cost):
     if plan and plan.operatorType()[-4:] == "Join":
       decoder = self.decodeJoins(plan);
-      sortDec = tuple( sorted( list(map(lambda x : x.relId(), decoder)) ) );
+      sortDec = tuple( sorted( list(map(lambda x : x.id(), decoder)) ) );
       if sortDec in self.statsCache:
         (_, c) = self.statsCache[sortDec];
         if cost[1] < c[1]:
@@ -65,7 +65,7 @@ class Optimizer:
       else:
         self.statsCache[sortDec] = (plan, cost);
     elif plan and plan.operatorType()[-4:] != "Join":
-      self.statsCache[plan.relId()] = cost;
+      self.statsCache[plan.id()] = cost;
     else:
       raise ValueError("Empty Plan!");
 
@@ -73,14 +73,14 @@ class Optimizer:
   def getPlanCost(self, plan):
     if plan and plan.operatorType()[-4:] == "Join":
       decoder = self.decodeJoins(plan);
-      sortDec = tuple( sorted( list(map(lambda x : x.relId(), decoder)) ) );
+      sortDec = tuple( sorted( list(map(lambda x : x.id(), decoder)) ) );
       if sortDec in self.statsCache:
         return self.statsCache[ sortDec ];
       else:
         raise ValueError("No such plan cached.");
     elif plan and plan.operatorType()[-4:] != "Join":
-      if plan.relId() in self.statsCache:
-        return self.statsCache[plan.relId()];
+      if plan.id() in self.statsCache:
+        return self.statsCache[plan.id()];
       else:
         raise ValueError("No such plan cached.");
     else:
@@ -436,8 +436,6 @@ class Optimizer:
     else:
       return False;
   
-  # return a dictionary:
-  # (key, value) ==> (accessPathTuple, their joinExpr) 
   def allAccessPaths(self, operator):
     totals = Plan(root=operator).flatten();
     joins  = [j for (_, j) in totals if j.operatorType()[-4:] == "Join"];
@@ -452,11 +450,11 @@ class Optimizer:
   def validJoin(self, operator, aPaths ):
     if (operator.lhsPlan in aPaths) and (operator.rhsPlan in aPaths):
       return True;
-    elif (operator.lhsPlan in aPaths) and (operator.rhsPlan.operatorType[-4:] == "Join"):
+    elif (operator.lhsPlan in aPaths) and (operator.rhsPlan.operatorType()[-4:] == "Join"):
       rPlan          = operator.rhsPlan;  
       subAccessPaths = self.allAccessPaths( rPlan );
       return self.validJoin(rPlan, subAccessPaths);
-    elif (operator.rhsPlan in aPaths) and (operator.lhsPlan.operatorType[-4:] == "Join"):
+    elif (operator.rhsPlan in aPaths) and (operator.lhsPlan.operatorType()[-4:] == "Join"):
       lPlan          = operator.lhsPlan;  
       subAccessPaths = self.allAccessPaths( lPlan );
       return self.validJoin(lPlan, subAccessPaths);
@@ -519,14 +517,14 @@ class Optimizer:
       numPages = Plan(root=aPath).sample( defaultScaleFactor ) / aPath.schema().size;
       # Here we only consider reorganize joins
       # so that we simple put accessPaths' totalcost as 0.
-      self.addPlanCost(aPlan, (numPages, 0));
-      prev[aPlan] = (numPages, 0);
+      self.addPlanCost(aPath, (numPages, 0));
+      prev[aPath] = (numPages, 0);
     # i = 2...n
     for i in range(1, n):
       # build current list with prev.
       # For 2-way joins, we don't need to care left deep plan
       for p in prev.keys():
-        accP = self.decodeJoins(p);
+        accP = self.allAccessPaths(p);
         remL = [item for item in aPaths if item not in accP];
         for base in remL:
           lhsSchema = p.schema();
