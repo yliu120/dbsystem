@@ -17,7 +17,7 @@ class DBFileSystemGC:
   
   @staticmethod
   def gc(opMarker=None, db=None):
-    fileNames = self.list_files(defaultDBPath);
+    fileNames = DBFileSystemGC.list_files(defaultDBPath);
 
     for file in fileNames:
       fName = defaultDBPath + '/' + file;

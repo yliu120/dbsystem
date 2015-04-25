@@ -506,7 +506,6 @@ class Optimizer:
   def joinsOptimizer(self, operator, aPaths):
     defaultScaleFactor = 50;
     defaultPartiNumber = 5;
-    storage            = operator.storage;
     # build join constraint list;
     joinExprs = self.decodeJoinExprs(operator);
     # build a local plan-cost dict:
@@ -568,10 +567,12 @@ class Optimizer:
               # Let's push newJoin onto the cache and curr list
               # cost: 3(M+N) + M's totalcost
               # then we renew newJoin's stepcost
-              newJoin.storage = storage;
+              newJoin.prepare( self.db );
               stepCost = 3 * (sCostL + costR[0]);
               totalCost = stepCost + tCostL;
-              pages = Plan(root=newJoin).sample( defaultScaleFactor ) / newJoin.schema().size;
+              cards = Plan(root=newJoin).sample( defaultScaleFactor );
+              pageSize, _, _ = self.db.storage.relationStats(newJoin.relationId());
+              pages = cards / (pageSize / newJoin.schema().size);
               self.addPlanCost(newJoin, (pages, totalCost));
               curr[newJoin] = (pages, totalCost);
                   
@@ -623,8 +624,6 @@ class Optimizer:
   def optimizeQuery(self, plan):
     pushedDown_plan = self.pushdownOperators(plan)
     joinPicked_plan = self.pickJoinOrder(pushedDown_plan)
-    
-    joinPicked_plan.prepare( self.db );
     # deleting all the sampling tmp files
     DBFileSystemGC.gc(db=self.db);
     return joinPicked_plan
