@@ -1,4 +1,6 @@
 from Query.Optimizer import Optimizer
+from itertools import combinations as comb
+from itertools import chain
 
 # This optimizer consider all bushy trees
 class BushyOptimizer(Optimizer):
@@ -57,7 +59,6 @@ class BushyOptimizer(Optimizer):
   >>> db.close();
   
   """
-     
   def __init__(self, db):
     super().__init__(db);
     
@@ -73,6 +74,69 @@ class BushyOptimizer(Optimizer):
     else:
       raise ValueError("Internally we don't stress this function to other cases");
 
+  # Helper function to test whether two plans are joinable
+  def joinable(self, joinExprs, twoPlan):
+    lhsSchema = twoPlan[0].schema();
+    rhsSchema = twoPlan[1].schema();
+    for (lField, rField) in joinExprs:
+      if lField in lhsSchema.fields and rField in rhsSchema.fields:
+        return (lField, rField);
+      elif lField in rhsSchema.fields and rField in lhsSchema.fields:
+        return (rField, lField);
+      else:
+        continue;
+    return None;
+  
+  # Helper function to return all the subsets (non-empty, non-full)
+  def powerset(iterable):
+    xs = list(iterable)
+    # note we return an iterator rather than a list
+    # We set range(1, len(xs) since we need non-empty, non-full subsets.
+    return chain.from_iterable( combinations(xs,n) for n in range(1, len(xs)) )
+  
   # Our main algorithm - bushy optimizer
   def joinsOptimizer(self, operator, aPaths):
-    return operator;
+    defaultScaleFactor = 5;
+    defaultPartiNumber = 5;
+    # build join constraint list;
+    joinExprs = self.decodeJoinExprs(operator);
+    # build a local plan-cost dict:
+    n         = len(aPaths);
+    # i = 1
+    for aPath in aPaths:
+      # Here we define cost by number of pages.
+      cards = Plan(root=aPath).sample( defaultScaleFactor );
+      pageSize, _, _ = self.db.storage.relationStats(aPath.relationId());
+      numPages = cards / (pageSize / aPath.schema().size);
+      # Here we only consider reorganize joins
+      # so that we simple put accessPaths' totalcost as 0.
+      self.addPlanCost(aPath, (numPages, 0));
+      
+    for i in range(1, n):
+      for S in comb(aPaths, i+1):
+        for O in self.powerset(S):
+          (planForO, costL) = self.statsCache[ tuple(sorted(list(map(lambda x : x.id(), O)))) ];
+          (remindPl, costR) = self.statsCache[ tuple(sorted(list(map(lambda x:x.id(), [ele for ele in S if ele not in O])))) ];
+          fields   = self.joinable(joinExprs, [planForO, remindPl]);
+          
+          # If we detect constraints, we will create a new join from here.
+          if fields is not None:
+            lKeySchema = DBSchema('left', [(f, t) for (f, t) in planForO.schema() if f == fields[0]]);
+            rKeySchema = DBSchema('right', [(f, t) for (f, t) in remindPl.schema() if f == fields[1]]);
+            lHashFn = 'hash(' + fields[0] + ') % ' + str(defaultPartiNumber);
+            rHashFn = 'hash(' + fields[1] + ') % ' + str(defaultPartiNumber);
+            newJoin = Join(currP[0], currP[1], method='hash', \
+                           lhsHashFn=lHashFn, lhsKeySchema=lKeySchema, \
+                           rhsHashFn=rHashFn, rhsKeySchema=rKeySchema)
+            if not self.isRightDeep(newJoin, aPaths):                 
+              newJoin.prepare( self.db );
+              # Calculate output pages;
+              cards = Plan(root=newJoin).sample( defaultScaleFactor );
+              pageSize, _, _ = self.db.storage.relationStats(newJoin.relationId());
+              pages = cards / (pageSize / newJoin.schema().size);
+              # Calculate output costs:
+              totalCost = costL[1] + costR[1] + 3 * (costL[0] + costR[0]);
+              # Add new Join to self.statsCache
+              self.addPlanCost(newJoin, (pages, totalCost));
+
+    return self.getPlanCost(operator)[0];

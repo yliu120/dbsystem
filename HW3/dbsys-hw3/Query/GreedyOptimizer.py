@@ -88,7 +88,7 @@ class GreedyOptimizer(Optimizer):
 
   # Our main algorithm - greedy optimizer
   def joinsOptimizer(self, operator, aPaths):
-    defaultScaleFactor = 2;
+    defaultScaleFactor = 5;
     defaultPartiNumber = 5;
 
     n = len(aPaths);

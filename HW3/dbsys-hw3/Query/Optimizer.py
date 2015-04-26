@@ -53,9 +53,13 @@ class Optimizer:
   # (AB)C, when we calculate the total cost of this join,
   # we use (AB)'s step cost and C's step cost to compute (AB)C's step cost
   # However, for (AB)C's total cost = (AB)C 's step cost + (AB) 's total cost
-  # Then we renew (AB)C's step cost to the correct form - the output pages num.
+  # Then we renew (AB)C's step cost to the correct value for the next
+  # step's calculation - the output pages num.
   # This is what we do in the joinsOptimizer() function as well.
-  # Therefore, for each plan, our cost is a tuple (stepcost, totalcost)
+  # Therefore, for each plan, our cost is a tuple (numOutputPages, totalcost)
+  # Here is a little confusing since we name the tuple as (stepcost, totalcost)
+  # Note that by this function addPlanCost, we automatically prune the optPlans
+  # that is, we discards all but the best plan.
   def addPlanCost(self, plan, cost):
     if plan and plan.operatorType()[-4:] == "Join":
       decoder = self.decodeJoins(plan);
