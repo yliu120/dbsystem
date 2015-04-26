@@ -515,7 +515,9 @@ class Optimizer:
     # i = 1
     for aPath in aPaths:
       # Here we define cost by number of pages.
-      numPages = Plan(root=aPath).sample( defaultScaleFactor ) / aPath.schema().size;
+      cards = Plan(root=aPath).sample( defaultScaleFactor );
+      pageSize, _, _ = self.db.storage.relationStats(aPath.relationId());
+      numPages = cards / (pageSize / aPath.schema().size);
       # Here we only consider reorganize joins
       # so that we simple put accessPaths' totalcost as 0.
       self.addPlanCost(aPath, (numPages, 0));

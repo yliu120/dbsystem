@@ -2,7 +2,6 @@ import os;
 
 class DBFileSystemGC:
   
-  
   defaultDBPath = './data';
   # close all the files in that directory.
   @staticmethod
