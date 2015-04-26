@@ -497,7 +497,7 @@ class Optimizer:
         # "nested-loops", "block-nested-loops", "hash"
         # indexed join cannot work.
         if operator.joinMethod == "nested-loops" or operator.joinMethod == "block-nested-loops":
-          lst.append( tuple( ExpressionInfo(operator.joinExpr).decomposeCNF() ) );
+          lst.append( tuple( ExpressionInfo(operator.joinExpr).getAttributes() ) );
         elif operator.joinMethod == "hash":
           lst.append( (operator.lhsKeySchema.fields[0], operator.rhsKeySchema.fields[0]) );
         else:
