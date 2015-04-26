@@ -1,5 +1,14 @@
 from Query.Optimizer import Optimizer
 
+from Query.Plan import Plan
+from Query.Operators.Join import Join
+from Query.Operators.Project import Project
+from Query.Operators.Select import Select
+from Utils.ExpressionInfo import ExpressionInfo
+from Catalog.Schema import DBSchema
+
+from DBFileSystemGC import DBFileSystemGC
+
 # This optimizer consider all bushy trees
 # greedily constructs plans using the cheapest
 # join available over the subplans.
@@ -50,6 +59,7 @@ class GreedyOptimizer(Optimizer):
         db.query().fromTable('grant'), \
         method='block-nested-loops', expr='p_id == g_projectid').finalize();
 
+  >>> db.optimizer = GreedyOptimizer(db);
   >>> db.optimizer.pickJoinOrder(query);
   >>> db.removeRelation('department');
   >>> db.removeRelation('employee');
@@ -60,6 +70,7 @@ class GreedyOptimizer(Optimizer):
   """
   def __init__(self, db):
     super().__init__(db);
+    self.pcntr = 0;
 
   # Helper function to test whether two plans are joinable
   def joinable(self, operator, twoPlan):
@@ -99,8 +110,11 @@ class GreedyOptimizer(Optimizer):
       # put the potential joins in potentialP
       # put the potential joins cost in potentialC
       m = len(planList);
+      potentialP = [];
+      potentialC = [];
       for j in range(0, m-1):
         for k in range(j+1, m):
+          self.pcntr += 1;
           potentialP.append((planList[j], planList[k]));
           potentialC.append(3*(costList[j][0] + costList[k][0]) + costList[j][1] + costList[k][1]);
       # find the cheapest joinable join (total cost)
@@ -109,8 +123,8 @@ class GreedyOptimizer(Optimizer):
       while(potentialC):
         currC = min(potentialC);
         currP = potentialP[potentialC.index(currC)];
-        poteintialC.remove(currC);
-        potientialP.remove(currP);
+        potentialC.remove(currC);
+        potentialP.remove(currP);
         if(self.joinable(operator, currP)):
           (lField, rField) = self.joinable(operator, currP);
           lhsSchema = currP[0].schema();
@@ -119,7 +133,7 @@ class GreedyOptimizer(Optimizer):
           rKeySchema = DBSchema('right', [(f, t) for (f, t) in rhsSchema.schema() if f == rField]);
           lHashFn = 'hash(' + lField + ') % ' + str(defaultPartiNumber);
           rHashFn = 'hash(' + rField + ') % ' + str(defaultPartiNumber);
-          newJoin = Join(p, rPlan, method='hash', \
+          newJoin = Join(currP[0], currP[1], method='hash', \
                          lhsHashFn=lHashFn, lhsKeySchema=lKeySchema, \
                          rhsHashFn=rHashFn, rhsKeySchema=rKeySchema)
                              
@@ -130,15 +144,15 @@ class GreedyOptimizer(Optimizer):
           pages = cards / (pageSize / newJoin.schema().size);
           
           id1 = planList.index(currP[0]);
-          id2 = planList.index(currP[1]);
           _ = planList.pop(id1);
+          id2 = planList.index(currP[1]);
           _ = planList.pop(id2);
           planList.append(newJoin);
           _ = costList.pop(id1);
           _ = costList.pop(id2);
           costList.append((pages, totalCost));
           break;
-        
+    print ("GreedyOptimizer plan considered: ", self.pcntr);
     return planList[0]
 
 # We provide a doctest entry main here.
