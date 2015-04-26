@@ -48,16 +48,30 @@ class BushyOptimizer(Optimizer):
         db.query().fromTable('grant'), \
         method='block-nested-loops', expr='p_id == g_projectid').finalize();
 
+  >>> db.optimizer = GreedyOptimizer(db);
   >>> db.optimizer.pickJoinOrder(query);
   >>> db.removeRelation('department');
   >>> db.removeRelation('employee');
   >>> db.removeRelation('project');
   >>> db.removeRelation('grant');
   >>> db.close();
-
+  
   """
+     
   def __init__(self, db):
     super().__init__(db);
+    
+  # Helper function to tell whether a plan is right-deep-plan
+  def isRightDeep(self, operator, aPaths):
+    if operator and operator.operatorType()[-4:] == "Join":
+      if operator.lhsPlan in aPaths and operator.rhsPlan in aPaths:
+        return True;
+      elif operator.lhsPlan in aPaths and operator.rhsPlan.operatorType()[-4:] == "Join":
+        return self.isRightDeep(operator.rhsPlan, aPaths);
+      else:
+        return False;
+    else:
+      raise ValueError("Internally we don't stress this function to other cases");
 
   # Our main algorithm - bushy optimizer
   def joinsOptimizer(self, operator, aPaths):
