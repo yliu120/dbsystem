@@ -8,23 +8,6 @@ class GreedyOptimizer(Optimizer):
   def __init__(self, db):
     super().__init__(db);
 
-  # revised version for bushy-trees
-  def decodeJoins(self, operator):
-    if operator:
-      lst = [];
-      if operator.operatorType()[-4:] == "Join":
-        if operator.lhsPlan.operatorType()[-4:] == "Join":
-          lst += self.decodeJoins(operator.lhsPlan);
-        else:
-          lst.append(operator.lhsPlan);
-        if operator.rhsPlan.operatorType()[-4:] == "Join":
-          lst += self.decodeJoins(operator.rhsPlan);
-        else: 
-          lst.append(operator.rhsPlan);
-        return lst;
-    else:
-      raise ValueError("Empty plan cannot be decoded.");
-
   # Helper function to test whether two plans are joinable
   def joinable(self, operator, twoPlan):
     joinExprs = self.decodeJoinExprs(operator);

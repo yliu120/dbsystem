@@ -463,17 +463,23 @@ class Optimizer:
     else:
       return false;
   
-  # This is an internal function serving as decoding left-deep-joins to
+  # This is an internal function serving as decoding left-deep-joins to a list
+  # contains only accessPaths
   # (t1 t2) t3 --> [t1, t2, t3]
+  #  t1(t2  t3)--> [t1, t2, t3]
+  # This function functions similar to allAccessPaths
+  # However, this function provides a  more cheaper way.
   def decodeJoins(self, operator):
     if operator:
       lst = [];
       if operator.operatorType()[-4:] == "Join":
         if operator.lhsPlan.operatorType()[-4:] == "Join":
           lst += self.decodeJoins(operator.lhsPlan);
-          lst.append(operator.rhsPlan);
-        else: 
+        else:
           lst.append(operator.lhsPlan);
+        if operator.rhsPlan.operatorType()[-4:] == "Join":
+          lst += self.decodeJoins(operator.rhsPlan);
+        else: 
           lst.append(operator.rhsPlan);
         return lst;
     else:
