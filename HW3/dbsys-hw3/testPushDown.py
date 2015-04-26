@@ -63,7 +63,7 @@ query3PD = db.optimizer.optimizeQuery( query3 );
 
 print( query3PD.explain() );
 
-
+db.close();
 
   
 #for page in db.processQuery( query1 ):

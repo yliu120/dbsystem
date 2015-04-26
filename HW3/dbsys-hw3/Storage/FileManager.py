@@ -106,8 +106,8 @@ class FileManager:
       for storageFile in self.fileMap.values():
         storageFile.close()
 
-    if self.indexManager:
-      self.indexManager.close()
+    #if self.indexManager:
+      #self.indexManager.close()
 
     self.checkpoint()
 
@@ -211,9 +211,9 @@ class FileManager:
   # Returns a tuple id for the newly inserted data.
   def insertTuple(self, relId, tupleData):
     (_, rFile) = self.relationFile(relId)
-    if rFile and self.indexManager:
+    if rFile:# and self.indexManager:
       tupleId = rFile.insertTuple(tupleData)
-      self.indexManager.insertTuple(relId, tupleData, tupleId)
+      #self.indexManager.insertTuple(relId, tupleData, tupleId)
       return tupleId
 
   def deleteTuple(self, relId, tupleId):

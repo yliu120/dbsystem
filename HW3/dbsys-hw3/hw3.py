@@ -274,3 +274,6 @@ query5 = db.query().fromTable('customer').join( \
             groupHashFn=(lambda gbVal: hash(gbVal) % 10)).select( \
             {'n_name' : ('N_NAME', 'char(25)'), \
              'revenue' : ('revenue', 'float')}).finalize();
+             
+             
+db.close();
