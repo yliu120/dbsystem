@@ -3,7 +3,7 @@ from Query.Optimizer import Optimizer
 # This optimizer consider all bushy trees
 # greedily constructs plans using the cheapest
 # join available over the subplans.
-class BushyOptimizer(Optimizer):
+class GreedyOptimizer(Optimizer):
     
   def __init__(self, db):
     super().__init__(db);
