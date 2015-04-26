@@ -71,7 +71,7 @@ class Optimizer:
       else:
         self.statsCache[sortDec] = (plan, cost);
     elif plan and plan.operatorType()[-4:] != "Join":
-      self.statsCache[plan.id()] = (plan, cost);
+      self.statsCache[tuple([plan.id()])] = (plan, cost);
     else:
       raise ValueError("Empty Plan!");
 
@@ -85,8 +85,8 @@ class Optimizer:
       else:
         raise ValueError("No such plan cached.");
     elif plan and plan.operatorType()[-4:] != "Join":
-      if plan.id() in self.statsCache:
-        return self.statsCache[plan.id()];
+      if tuple(plan.id()) in self.statsCache:
+        return self.statsCache[tuple([plan.id()])];
       else:
         raise ValueError("No such plan cached.");
     else:

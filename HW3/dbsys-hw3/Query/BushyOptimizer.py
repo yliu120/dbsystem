@@ -1,6 +1,12 @@
 from Query.Optimizer import Optimizer
 from itertools import combinations as comb
 from itertools import chain
+from Query.Plan import Plan
+from Query.Operators.Join import Join
+from Query.Operators.Project import Project
+from Query.Operators.Select import Select
+from Utils.ExpressionInfo import ExpressionInfo
+from Catalog.Schema import DBSchema
 
 # This optimizer consider all bushy trees
 class BushyOptimizer(Optimizer):
@@ -17,6 +23,7 @@ class BushyOptimizer(Optimizer):
   >>> import Database
   >>> from Query.Optimizer import Optimizer
   >>> from Catalog.Schema import DBSchema
+  >>> from Query.Plan import Plan
   >>> db = Database.Database()
   >>> deptSchema = DBSchema('department', [('d_id', 'int'), ('d_name', 'char(30)')]);
   >>> emplSchema = DBSchema('employee', [('e_id', 'int'), ('e_name', 'char(30)'), ('e_projectid', 'int')])
@@ -50,7 +57,7 @@ class BushyOptimizer(Optimizer):
         db.query().fromTable('grant'), \
         method='block-nested-loops', expr='p_id == g_projectid').finalize();
 
-  >>> db.optimizer = GreedyOptimizer(db);
+  >>> db.optimizer = BushyOptimizer(db);
   >>> db.optimizer.pickJoinOrder(query);
   >>> db.removeRelation('department');
   >>> db.removeRelation('employee');
@@ -88,11 +95,11 @@ class BushyOptimizer(Optimizer):
     return None;
   
   # Helper function to return all the subsets (non-empty, non-full)
-  def powerset(iterable):
+  def powerSet(self, iterable):
     xs = list(iterable)
     # note we return an iterator rather than a list
     # We set range(1, len(xs) since we need non-empty, non-full subsets.
-    return chain.from_iterable( combinations(xs,n) for n in range(1, len(xs)) )
+    return chain.from_iterable( comb(xs,n) for n in range(1, len(xs)) )
   
   # Our main algorithm - bushy optimizer
   def joinsOptimizer(self, operator, aPaths):
@@ -111,21 +118,21 @@ class BushyOptimizer(Optimizer):
       # Here we only consider reorganize joins
       # so that we simple put accessPaths' totalcost as 0.
       self.addPlanCost(aPath, (numPages, 0));
-      
+
     for i in range(1, n):
       for S in comb(aPaths, i+1):
-        for O in self.powerset(S):
+        for O in self.powerSet(S):
           (planForO, costL) = self.statsCache[ tuple(sorted(list(map(lambda x : x.id(), O)))) ];
           (remindPl, costR) = self.statsCache[ tuple(sorted(list(map(lambda x:x.id(), [ele for ele in S if ele not in O])))) ];
           fields   = self.joinable(joinExprs, [planForO, remindPl]);
           
           # If we detect constraints, we will create a new join from here.
           if fields is not None:
-            lKeySchema = DBSchema('left', [(f, t) for (f, t) in planForO.schema() if f == fields[0]]);
-            rKeySchema = DBSchema('right', [(f, t) for (f, t) in remindPl.schema() if f == fields[1]]);
+            lKeySchema = DBSchema('left', [(f, t) for (f, t) in planForO.schema().schema() if f == fields[0]]);
+            rKeySchema = DBSchema('right', [(f, t) for (f, t) in remindPl.schema().schema() if f == fields[1]]);
             lHashFn = 'hash(' + fields[0] + ') % ' + str(defaultPartiNumber);
             rHashFn = 'hash(' + fields[1] + ') % ' + str(defaultPartiNumber);
-            newJoin = Join(currP[0], currP[1], method='hash', \
+            newJoin = Join(planForO, remindPl, method='hash', \
                            lhsHashFn=lHashFn, lhsKeySchema=lKeySchema, \
                            rhsHashFn=rHashFn, rhsKeySchema=rKeySchema)
             if not self.isRightDeep(newJoin, aPaths):                 
@@ -140,3 +147,8 @@ class BushyOptimizer(Optimizer):
               self.addPlanCost(newJoin, (pages, totalCost));
 
     return self.getPlanCost(operator)[0];
+
+# We provide a doctest entry main here.
+if __name__ == "__main__":
+    import doctest
+    doctest.testmod()
