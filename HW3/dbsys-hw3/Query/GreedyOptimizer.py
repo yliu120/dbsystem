@@ -103,6 +103,9 @@ class GreedyOptimizer(Optimizer):
         for k in range(j+1, m):
           potentialP.append((planList[j], planList[k]));
           potentialC.append(3*(costList[j][0] + costList[k][0]) + costList[j][1] + costList[k][1]);
+      # find the cheapest joinable join (total cost)
+      # build the join, remove the used two base plan and add the new join to planList
+      # modify the costList as well
       while(potentialC):
         currC = min(potentialC);
         currP = potentialP[potentialC.index(currC)];
