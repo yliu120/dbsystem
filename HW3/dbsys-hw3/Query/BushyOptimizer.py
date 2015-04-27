@@ -7,6 +7,7 @@ from Query.Operators.Project import Project
 from Query.Operators.Select import Select
 from Utils.ExpressionInfo import ExpressionInfo
 from Catalog.Schema import DBSchema
+from test.test_iterlen import NoneLengthHint
 
 # This optimizer consider all bushy trees
 class BushyOptimizer(Optimizer):
@@ -122,8 +123,25 @@ class BushyOptimizer(Optimizer):
     for i in range(1, n):
       for S in comb(aPaths, i+1):
         for O in self.powerSet(S):
-          (planForO, costL) = self.statsCache[ tuple(sorted(list(map(lambda x : x.id(), O)))) ];
-          (remindPl, costR) = self.statsCache[ tuple(sorted(list(map(lambda x:x.id(), [ele for ele in S if ele not in O])))) ];
+          
+          # The following codes are added because some subPlans may
+          # not be present in the self.statsCache as
+          # 1) it was filtered out because it is a right-deep
+          # 2) it has not any constraint associated.
+          keyL = tuple(sorted(list(map(lambda x : x.id(), O))));
+          keyR = tuple(sorted(list(map(lambda x:x.id(), [ele for ele in S if ele not in O]))));
+          
+          planForO = None;
+          remindPl = None;
+          costL    = None;
+          costR    = None;
+          
+          if keyL in self.statsCache and keyR in self.statsCache:
+            (planForO, costL) = self.statsCache[ tuple(sorted(list(map(lambda x : x.id(), O)))) ];
+            (remindPl, costR) = self.statsCache[ tuple(sorted(list(map(lambda x:x.id(), [ele for ele in S if ele not in O])))) ];
+          else:
+            continue;
+          
           fields   = self.joinable(joinExprs, [planForO, remindPl]);
           
           # If we detect constraints, we will create a new join from here.
@@ -135,7 +153,7 @@ class BushyOptimizer(Optimizer):
             newJoin = Join(planForO, remindPl, method='hash', \
                            lhsHashFn=lHashFn, lhsKeySchema=lKeySchema, \
                            rhsHashFn=rHashFn, rhsKeySchema=rKeySchema)
-            if not self.isRightDeep(newJoin, aPaths):                 
+            if (i == 1) or (not self.isRightDeep(newJoin, aPaths)):               
               newJoin.prepare( self.db );
               # Calculate output pages;
               cards = Plan(root=newJoin).sample( defaultScaleFactor );
