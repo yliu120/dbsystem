@@ -1,0 +1,68 @@
+###########################################################
+
+		Assignment 3 Query Opt
+		Author: Yunlong Liu, Qing Liu
+		Email: yliu120@jhmi.edu
+		       qingliu@jhu.edu
+
+###########################################################
+
+Question 1 2: See Optimizer.py
+Question 3:   See Query.Operators.Join and 
+                  Query.Operators.GroupBy
+	      We overrided the local cost function in both
+              operator classes.
+
+Question 4:   See Query.BushyOptimizer and
+                  Query.GreedyOptimizer
+	      For this question, we provide doctests and
+              the synthetic data tests. We use 2,4,6 Joins 
+	      to profile the optimizer's performance. This
+	      is because we don't want to make the test run
+	      a very long time.
+
+The programs are: testBushOptimizer.py and testGreedyOptimizer.py
+
+Here are the results:
+
+Testing Bushy Optimizer.
+Joining 2 Plans uses:14.27082109451294
+Joining 4 Plans uses:45.26936101913452
+Joining 6 Plans uses:83.75198197364807
+
+Testing Greedy Optimizer.
+GreedyOptimizer plan considered:  1
+Joining 2 Plans uses:7.11523699760437
+GreedyOptimizer plan considered:  10
+Joining 4 Plans uses:7.7177441120147705
+GreedyOptimizer plan considered:  35
+Joining 6 Plans uses:14.510539054870605
+
+From the result we can see:
+1) Greedy Optimizer runs faster than Bushy because of
+the algorithm only consider the cheapest subPlan each time
+2) Greedy Optimizer may consider less plans so that when
+making more joins, it save time.
+
+Question 5:
+
+File : hw3.py
+We only provides the optimized plan in hw3.py since sampling
+needs very long time for some large joins. We can't run the 
+queries even with 0.1GB datasets since it takes extremely
+long time except the first two queries.
+
+Notice:
+1) We found some bugs in the codebase and we correct them
+in our way. So please use our entire codebase to run our test
+cases.
+2) The datasets provided were generated on ugrad with BDB5.23.
+We can't replicate the building environment of the ugrad so
+the indexed stuff cannot run on our own computer. We tested all
+the program on ugrad and they are running normally with BDB. That
+means enabling BDB indexing cannot do harm to our test program.
+3) We provide several tools for cleaning the database data folder.
+please try:
+  i) clear.py --- clearing all the temp files, a standalone version
+  ii) DBFileSystemGC -- a garbage collector that collects all the 
+                        temp files, we embeded it in our code base. 
