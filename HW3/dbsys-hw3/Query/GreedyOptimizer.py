@@ -16,7 +16,7 @@ class GreedyOptimizer(Optimizer):
   
   """
   A query optimization class which implements the dynamic programming optimizer
-  algorithm in a greedy way. In this algorithm, we consider any form of the join
+  algorithm in the slides. In this algorithm, we consider any form of the join
   plan, such as left-deep plan, bushy-plan and right deep plan. 
   
   For performance consideration, we do not provide any real dataset tests for
@@ -26,6 +26,7 @@ class GreedyOptimizer(Optimizer):
   >>> import Database
   >>> from Query.Optimizer import Optimizer
   >>> from Catalog.Schema import DBSchema
+  >>> from Query.Plan import Plan
   >>> db = Database.Database()
   >>> deptSchema = DBSchema('department', [('d_id', 'int'), ('d_name', 'char(30)')]);
   >>> emplSchema = DBSchema('employee', [('e_id', 'int'), ('e_name', 'char(30)'), ('e_projectid', 'int')])
@@ -60,13 +61,14 @@ class GreedyOptimizer(Optimizer):
         method='block-nested-loops', expr='p_id == g_projectid').finalize();
 
   >>> db.optimizer = GreedyOptimizer(db);
-  >>> db.optimizer.pickJoinOrder(query);
+  >>> db.optimizer.pickJoinOrder(query).explain();
+      ...
   >>> db.removeRelation('department');
   >>> db.removeRelation('employee');
   >>> db.removeRelation('project');
   >>> db.removeRelation('grant');
   >>> db.close();
-
+  
   """
   def __init__(self, db):
     super().__init__(db);
@@ -88,7 +90,7 @@ class GreedyOptimizer(Optimizer):
 
   # Our main algorithm - greedy optimizer
   def joinsOptimizer(self, operator, aPaths):
-    defaultScaleFactor = 5;
+    defaultScaleFactor = 10;
     defaultPartiNumber = 5;
 
     n = len(aPaths);

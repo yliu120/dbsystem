@@ -85,7 +85,7 @@ class Optimizer:
       else:
         raise ValueError("No such plan cached.");
     elif plan and plan.operatorType()[-4:] != "Join":
-      if tuple(plan.id()) in self.statsCache:
+      if tuple([plan.id()]) in self.statsCache:
         return self.statsCache[tuple([plan.id()])];
       else:
         raise ValueError("No such plan cached.");
@@ -602,9 +602,11 @@ class Optimizer:
     if operator in accessPaths:
       return operator;
     else:
-      if (operator.operatorType() == "TableScan" or operator.operatorType() == "Select" or \
+      if (operator.operatorType() == "Select" or \
          operator.operatorType() == "Project" or operator.operatorType() == "GroupBy"):
         operator.subPlan = self.optimizeJoins( operator.subPlan );
+        return operator;
+      elif operator.operatorType() == "TableScan":
         return operator;
       elif operator.operatorType() == "UnionAll":
         operator.lhsPlan = self.optimizeJoins( operator.lhsPlan );

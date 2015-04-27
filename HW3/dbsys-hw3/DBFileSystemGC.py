@@ -1,4 +1,5 @@
 import os;
+import sys;
 
 class DBFileSystemGC:
   
@@ -16,6 +17,9 @@ class DBFileSystemGC:
   
   @staticmethod
   def gc(opMarker=None, db=None):
+    
+    from Database import Database;
+      
     fileNames = DBFileSystemGC.list_files(DBFileSystemGC.defaultDBPath);
 
     for file in fileNames:

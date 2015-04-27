@@ -77,7 +77,6 @@ class Select(Operator):
     if self.inputIterator is None:
       self.inputIterator = iter(self.subPlan)
 
-    print("Processing " + self.explain());
     # Process all pages from the child operator.
     try:
       for (pageId, page) in self.inputIterator:
@@ -91,9 +90,6 @@ class Select(Operator):
     # StopIteration exception during its work. We catch this and ignore in batch mode.
     except StopIteration:
       pass
-
-    print("select estimate card: " + str(self.estimatedCardinality));
-    print("Done with " + self.explain());
     # Return an iterator to the output relation
     return self.storage.pages(self.relationId())
 

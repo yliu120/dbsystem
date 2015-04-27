@@ -1,4 +1,4 @@
-import random
+import random, math
 from Query.Operator import Operator
 
 class TableScan(Operator):
@@ -37,13 +37,13 @@ class TableScan(Operator):
     self.pageIterator = self.storage.pages(self.relId)
     self.nextPageId, self.nextPage = None, None
     self.pageSize, self.numPages, _ = self.storage.relationStats(self.relId)
-    self.pageTuples = self.pageSize / self.schema().size;
-    p = max(1, self.cardinality(False) / (self.pageTuples * self.sampleFactor))
+    self.pageTuples = math.floor( self.pageSize / self.schema().size );
+    p = max(1, self.cardinality(False) / (self.pageTuples * self.sampleFactor));
     self.sampleSize = p if self.sampled else 0
     self.prevPageIndex, self.pagesToSample = (0, p)
     
     self.counter = 0;
-    self.randomNums = sorted( random.sample(range(int(self.numPages)), int(p)) );
+    self.randomNums = sorted( random.sample(range(int(self.numPages)), math.ceil(p)) );
     return self
 
   # Table scans are always pipelined.

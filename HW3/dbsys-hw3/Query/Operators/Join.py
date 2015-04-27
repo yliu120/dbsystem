@@ -4,6 +4,8 @@ from Catalog.Schema import DBSchema
 from Query.Operator import Operator
 from time import time;
 
+import math;
+
 class Join(Operator):
   def __init__(self, lhsPlan, rhsPlan, **kwargs):
     super().__init__(**kwargs)
@@ -366,6 +368,41 @@ class Join(Operator):
         ))) + ")"
 
     return super().explain() + exprs
+  
+  # We override the cost model here.
+  # This cost model cannot be compatible with the general 
+  # operators' costs so that it is not used during Join
+  # Optimization.
+  def localCost(self, estimated):
+
+    if estimated:
+      l_inputPages   = 0;
+      r_inputPages   = 0;
+      fileSize       = 0;
+      pageBlockNum   = 0;
+      try:
+        _, l_inputPages, _ = self.storage.relationStats(self.lhsPlan.relationId());
+        _, r_inputPages, _ = self.storage.relationStats(self.rhsPlan.relationId());
+        pageBlockNum           = math.ceil( l_inputPages / self.storage.bufferPool.numPages() );
+      except:
+        pass
+      
+      l_inputPages *= self.sampleFactor;
+      r_inputPages *= self.sampleFactor;
+    
+    if (self.joinMethod == "nested-loops"):
+      local_cost = l_inputPages + self.lhsPlan.cardinality * r_inputPages;
+    elif (self.joinMethod == "block-nested-loops"):
+      local_cost = l_inputPages + pageBlockNum * r_inputPages;
+    # We don't support indexed
+    # elif (self.joinMethod == "indexed"):
+        # index_pages = self.storage.fileMgr.getIndex(self.indexID).numPages(); Not verified with BDB index file
+        # rmatch_pages = ?
+        # local_cost = l_inputPages + self.lhsPlan.cardinality * (index_pages + rmatch_pages);
+    
+    elif (self.joinMethod == "hash"):
+      local_cost = 3 * (l_inputPages + r_inputPages);
+    return local_cost;
 
 # An iterator class for looping over pairs of pages from partition files.
 class PartitionIterator:

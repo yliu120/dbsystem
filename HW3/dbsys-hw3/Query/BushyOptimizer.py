@@ -59,7 +59,7 @@ class BushyOptimizer(Optimizer):
         method='block-nested-loops', expr='p_id == g_projectid').finalize();
 
   >>> db.optimizer = BushyOptimizer(db);
-  >>> db.optimizer.pickJoinOrder(query);
+  >>> db.optimizer.pickJoinOrder(query).explain();
   >>> db.removeRelation('department');
   >>> db.removeRelation('employee');
   >>> db.removeRelation('project');
@@ -104,7 +104,7 @@ class BushyOptimizer(Optimizer):
   
   # Our main algorithm - bushy optimizer
   def joinsOptimizer(self, operator, aPaths):
-    defaultScaleFactor = 5;
+    defaultScaleFactor = 10;
     defaultPartiNumber = 5;
     # build join constraint list;
     joinExprs = self.decodeJoinExprs(operator);
@@ -143,7 +143,6 @@ class BushyOptimizer(Optimizer):
             continue;
           
           fields   = self.joinable(joinExprs, [planForO, remindPl]);
-          
           # If we detect constraints, we will create a new join from here.
           if fields is not None:
             lKeySchema = DBSchema('left', [(f, t) for (f, t) in planForO.schema().schema() if f == fields[0]]);

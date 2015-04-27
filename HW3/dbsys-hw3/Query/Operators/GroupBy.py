@@ -170,3 +170,19 @@ class GroupBy(Operator):
   def explain(self):
     return super().explain() + "(groupSchema=" + self.groupSchema.toString() \
                              + ", aggSchema=" + self.aggSchema.toString() + ")"
+
+  # We override the cost model here.
+  # This cost model cannot be compatible with the general 
+  # operators' costs so that it is not used during Join
+  # Optimization.
+  def localCost(self, estimated):
+    if estimated:
+      inputPages   = 0;
+      try:
+        _, inputPages, _ = self.storage.relationStats(self.subPlan.relationId());
+        inputPages *= self.sampleFactor;
+      except:
+        pass
+    else:
+      _, inputPages, _ = self.storage.relationStats(self.subPlan.relationId());
+    return 3 * inputPages;

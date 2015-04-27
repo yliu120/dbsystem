@@ -171,7 +171,7 @@ groupKeySchema = DBSchema('groupKey', [('C_CUSTKEY', 'int'), ('C_NAME', 'char(25
 groupAggSchema = DBSchema('groupAgg', [('revenue','float')]);
 
 query4 = db.query().fromTable('customer').join( \
-            db.query().fromTalbe('orders'),
+            db.query().fromTable('orders'),
             method = 'hash', \
             lhsHashFn = 'hash(C_CUSTKEY) % 5', lhsKeySchema = ls1, \
             rhsHashFn = 'hash(O_CUSTKEY) % 5', rhsKeySchema = rs1).join( \
@@ -246,7 +246,7 @@ groupKeySchema = DBSchema('groupKey', [('N_NAME', 'char(25)')]);
 groupAggSchema = DBSchema('groupAgg', [('revenue','float')]);
 
 query5 = db.query().fromTable('customer').join( \
-            db.query().fromTalbe('orders'),
+            db.query().fromTable('orders'),
             method = 'hash', \
             lhsHashFn = 'hash(C_CUSTKEY) % 5', lhsKeySchema = ls1, \
             rhsHashFn = 'hash(O_CUSTKEY) % 5', rhsKeySchema = rs1).join( \
@@ -275,5 +275,31 @@ query5 = db.query().fromTable('customer').join( \
             {'n_name' : ('N_NAME', 'char(25)'), \
              'revenue' : ('revenue', 'float')}).finalize();
              
-             
+ 
+# print out result for optimization
+# query1
+print( query1.explain() );
+query1Opt = db.optimizer.optimizeQuery( query1 );
+print( query1Opt.explain() );
+
+# query1
+print( query2.explain() );
+query2Opt = db.optimizer.optimizeQuery( query2 );
+print( query2Opt.explain() );
+
+# query1
+print( query3.explain() );
+query3Opt = db.optimizer.optimizeQuery( query3 );
+print( query3Opt.explain() );
+
+# query1
+print( query4.explain() );
+query4Opt = db.optimizer.optimizeQuery( query4 );
+print( query4Opt.explain() );
+
+# query1
+print( query5.explain() );
+query5Opt = db.optimizer.optimizeQuery( query5 );
+print( query5Opt.explain() );
+            
 db.close();
